@@ -1,4 +1,4 @@
--- This file has been generated from package.yaml by hpack version 0.14.0.
+-- This file has been generated from package.yaml by hpack version 0.15.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -22,6 +22,7 @@ executable server
     , servant-server
     , transformers
     , containers
+    , optparse-applicative
   other-modules:
       Api
       App
@@ -44,6 +45,7 @@ test-suite spec
     , servant-server
     , transformers
     , containers
+    , optparse-applicative
     , warp >= 3.2.3
     , hspec
     , servant-client

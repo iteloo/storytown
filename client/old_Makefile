@@ -1,0 +1,10 @@
+# ../assets/index.html: Api.elm Main.elm
+# 	elm make Main.elm
+# 	mv index.html ../assets/
+#
+
+# run-tests: tests.js
+	# node tests.js
+#
+# tests.js: Main.elm Api.elm Tests.elm
+# 	elm make Tests.elm --output tests.js

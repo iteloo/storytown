@@ -1,19 +1,19 @@
 resolver: lts-7.14
 
 packages:
-  - location: ./.
-  - location:
-      git: https://www.github.com/soenkehahn/wai-make-assets
-      commit: c72a924
-    extra-dep: true
-  # - location:
-  #     git: https://www.github.com/mattjbray/elm-export
-  #     commit: d995e32482f9704efb5d7d08568b56c518f01bd0
-  #   extra-dep: True
-  - location:
-      git: https://www.github.com/mattjbray/servant-elm
-      commit: 5d9bbcd9fcb6e1bdc0f3398cb95147e621d97837
-    extra-dep: True
+- .
+- location:
+    git: https://www.github.com/soenkehahn/wai-make-assets
+    commit: c72a924
+  extra-dep: true
+# - location:
+#     git: https://www.github.com/mattjbray/elm-export
+#     commit: d995e32482f9704efb5d7d08568b56c518f01bd0
+#   extra-dep: True
+- location:
+    git: https://www.github.com/mattjbray/servant-elm
+    commit: 5d9bbcd9fcb6e1bdc0f3398cb95147e621d97837
+  extra-dep: True
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:

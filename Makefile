@@ -4,6 +4,8 @@ setup: client-setup server-setup
 
 build: client-build server-build
 
+install: client-build server-install
+
 client-setup:
 	(cd client ; elm package install -y)
 
@@ -16,6 +18,9 @@ server-setup:
 
 server-build:
 	stack build
+
+server-install:
+	stack install
 
 server-start: server-build
 	stack exec server

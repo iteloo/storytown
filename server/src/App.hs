@@ -23,7 +23,8 @@ app =
 
 server :: IO (Server WithAssets)
 server = do
-  assets <- serveAssets
+  -- assets <- serveAssets
+  let assets = serveDirectory "assets"
   db <- mkDB
   return $ apiServer db :<|> assets
 

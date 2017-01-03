@@ -1,0 +1,12 @@
+{
+    "name": "TodoMVC in Elm",
+    "repository": "https://github.com/srid/elm-todomvc",
+    "env": {
+        "ELM_COMPILE": ""
+    },
+    "buildpacks": [
+        {
+            "url": "https://github.com/iteloo/heroku-buildpack-stack.git"
+        }
+    ]
+}
