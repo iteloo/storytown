@@ -12,6 +12,12 @@ dependencies:
   - transformers
   - containers
   - optparse-applicative
+  - persistent-postgresql
+  - persistent
+  - persistent-template
+  - heroku-persistent
+  - monad-logger
+  - wai-extra
 
 executables:
   server:

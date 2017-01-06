@@ -23,6 +23,12 @@ executable server
     , transformers
     , containers
     , optparse-applicative
+    , persistent-postgresql
+    , persistent
+    , persistent-template
+    , heroku-persistent
+    , monad-logger
+    , wai-extra
   other-modules:
       Api
       App
@@ -46,6 +52,12 @@ test-suite spec
     , transformers
     , containers
     , optparse-applicative
+    , persistent-postgresql
+    , persistent
+    , persistent-template
+    , heroku-persistent
+    , monad-logger
+    , wai-extra
     , warp >= 3.2.3
     , hspec
     , servant-client
