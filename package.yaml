@@ -18,6 +18,7 @@ dependencies:
   - heroku-persistent
   - monad-logger
   - wai-extra
+  - bytestring
 
 executables:
   server:

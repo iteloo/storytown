@@ -47,7 +47,8 @@ type ItemApi =
          "item" :> Get '[JSON] [ItemId]
     :<|> "item" :> Capture "itemId" ItemId :> Get '[JSON] Item
     :<|> "item" :> ReqBody '[JSON] String :> Post '[JSON] ItemId
-    :<|> "item" :> Capture "itemId" ItemId :> Delete '[JSON] ()
+    :<|> "item" :> Capture "itemId" ItemId :> Delete '[JSON] NoContent
+
   )
 
 itemApi :: Proxy ItemApi

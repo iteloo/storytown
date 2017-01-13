@@ -15,6 +15,7 @@ import           Servant.Elm  (ElmType, Proxy (Proxy), defElmImports,
 spec :: Spec
 spec = Spec ["Api"]
             (defElmImports
+             : toElmTypeSource    (Proxy :: Proxy NoContent)
              : toElmTypeSource    (Proxy :: Proxy Item)
              : toElmDecoderSource (Proxy :: Proxy Item)
              : toElmEncoderSource (Proxy :: Proxy Item)

@@ -18,8 +18,12 @@ import           Api
 
 
 data Config = Config {
-  pool :: DB.ConnectionPool
+    pool :: DB.ConnectionPool
+  , env  :: Environment
 }
+
+data Environment = Development | Test | Production
+  deriving (Show, Read)
 
 startApp :: Config -> IO Application
 startApp cfg = do
@@ -62,6 +66,6 @@ postItem :: String -> MyHandler ItemId
 postItem new =  fmap DB.fromSqlKey $ runDb
     $ DB.insert (DItem new)
 
-deleteItem :: ItemId -> MyHandler ()
-deleteItem itemid = runDb
+deleteItem :: ItemId -> MyHandler NoContent
+deleteItem itemid = fmap (\() -> NoContent) $ runDb
     $ DB.delete (DB.toSqlKey itemid :: Key DItem)
