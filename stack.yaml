@@ -21,3 +21,6 @@ extra-deps:
 - time-1.5.0.1
 - heroku-persistent-0.2.0
 - heroku-0.1.2.3
+- servant-auth-0.2.1.0
+- servant-auth-server-0.2.1.0
+- jose-0.5.0.2

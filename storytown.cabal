@@ -30,6 +30,8 @@ executable server
     , monad-logger
     , wai-extra
     , bytestring
+    , servant-auth
+    , servant-auth-server
   other-modules:
       Api
       App
@@ -60,6 +62,8 @@ test-suite spec
     , monad-logger
     , wai-extra
     , bytestring
+    , servant-auth
+    , servant-auth-server
     , warp >= 3.2.3
     , hspec
     , servant-client

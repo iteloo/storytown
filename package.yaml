@@ -19,6 +19,8 @@ dependencies:
   - monad-logger
   - wai-extra
   - bytestring
+  - servant-auth
+  - servant-auth-server
 
 executables:
   server:

@@ -1,9 +1,6 @@
-
 import           Network.Wai.Handler.Warp
 import           System.Environment
 import           System.IO
-
-import           App
 
 import           Control.Monad.IO.Class               (liftIO)
 import           Control.Monad.Logger                 (runNoLoggingT,
@@ -14,6 +11,8 @@ import           Network.Wai.Middleware.RequestLogger (logStdout, logStdoutDev)
 import           Options.Applicative
 import           Text.Read                            (readMaybe)
 import           Web.Heroku.Persist.Postgresql        (fromDatabaseUrl)
+
+import           App
 
 
 main :: IO ()
@@ -34,10 +33,10 @@ main = do
           Production  -> logStdoutDev  -- [todo] disable in future
   let p = port opts
       settings =
-        setPort p $
-        setBeforeMainLoop
-          (hPutStrLn stderr ("listening on port " ++ show p ++ "...")) $
-        defaultSettings
+          setPort p
+        $ setBeforeMainLoop
+          (hPutStrLn stderr ("listening on port " ++ show p ++ "..."))
+        $ defaultSettings
   runStdoutLoggingT
     $ withPostgresqlPool (pgConnStr pgconf) (pgPoolSize pgconf)
     $ \pool -> liftIO $ do

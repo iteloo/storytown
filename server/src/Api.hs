@@ -20,6 +20,7 @@ import           Database.Persist.TH
 import           GHC.Generics
 import           Servant.API
 import           Servant.Elm
+import Servant.Auth.Server
 
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
@@ -41,6 +42,33 @@ data Item
 instance ToJSON Item
 instance ElmType Item
 
+data User = User { name :: String, email :: String }
+   deriving (Eq, Show, Read, Generic)
+
+instance ToJSON User
+instance ToJWT User
+instance FromJSON User
+instance FromJWT User
+
+data Login = Login { username :: String, password :: String }
+   deriving (Eq, Show, Read, Generic)
+
+instance ToJSON Login
+instance FromJSON Login
+
+type Protected
+   = "name" :> Get '[JSON] String
+ :<|> "email" :> Get '[JSON] String
+
+type Unprotected =
+      Raw
+ -- :<|> "login"
+ --     :> ReqBody '[JSON] Login
+ --     :> PostNoContent '[JSON] (Headers '[Header "Set-Cookie" SetCookie] NoContent)
+
+type API auths =
+       (Auth auths User :> Protected)
+  :<|> Unprotected
 
 type ItemApi =
   "api" :> (
