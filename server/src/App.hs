@@ -9,13 +9,13 @@ import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
-import           System.IO
 import qualified Data.ByteString.Lazy.Char8          as BS
 import qualified Database.Persist                    as DB
 import qualified Database.Persist.Postgresql         as DB
 import           Servant
 import           Servant.Auth.Server
 import           Servant.Auth.Server.SetCookieOrphan ()
+import           System.IO
 
 import           Api
 
