@@ -19,16 +19,16 @@ import           Database.Persist
 import           Database.Persist.TH
 import           GHC.Generics
 import           Servant.API
+import           Servant.Auth.Server
 import           Servant.Elm
-import Servant.Auth.Server
 
+-- DATA MODELS
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 DItem
     text String
     deriving Show
 |]
-
 
 type ItemId = Int64
 
@@ -55,29 +55,30 @@ data Login = Login { username :: String, password :: String }
 
 instance ToJSON Login
 instance FromJSON Login
+instance ElmType Login
 
-type Protected
-   = "name" :> Get '[JSON] String
- :<|> "email" :> Get '[JSON] String
-
-type Unprotected =
-      Raw
- -- :<|> "login"
- --     :> ReqBody '[JSON] Login
- --     :> PostNoContent '[JSON] (Headers '[Header "Set-Cookie" SetCookie] NoContent)
+-- API
 
 type API auths =
-       (Auth auths User :> Protected)
+       SubAPI auths
+  :<|> Raw
+
+type SubAPI auths =
+    (Auth auths User :> "api" :> Protected)
   :<|> Unprotected
 
+type Protected =
+       "name" :> Get '[JSON] String
+  :<|> "email" :> Get '[JSON] String
+  :<|> "item" :> ItemApi
+
+type Unprotected =
+  "login"
+    :> ReqBody '[JSON] Login
+    :> Post '[JSON] String
+
 type ItemApi =
-  "api" :> (
-         "item" :> Get '[JSON] [ItemId]
-    :<|> "item" :> Capture "itemId" ItemId :> Get '[JSON] Item
-    :<|> "item" :> ReqBody '[JSON] String :> Post '[JSON] ItemId
-    :<|> "item" :> Capture "itemId" ItemId :> Delete '[JSON] NoContent
-
-  )
-
-itemApi :: Proxy ItemApi
-itemApi = Proxy
+       Get '[JSON] [ItemId]
+  :<|> Capture "itemId" ItemId :> Get '[JSON] Item
+  :<|> ReqBody '[JSON] String :> Post '[JSON] ItemId
+  :<|> Capture "itemId" ItemId :> Delete '[JSON] NoContent

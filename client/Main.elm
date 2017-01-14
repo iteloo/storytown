@@ -8,6 +8,7 @@ import Html.Events exposing (..)
 import Http
 import Task exposing (Task, perform)
 import Api exposing (..)
+import HttpBuilder
 
 
 main : Program Never Model Msg
@@ -28,6 +29,7 @@ type alias Model =
     { items : Dict Int Item
     , addItemInput : String
     , error : Maybe String
+    , jwtToken : Maybe String
     }
 
 
@@ -38,11 +40,14 @@ type alias ItemId =
 init : ( Model, Cmd Msg )
 init =
     let
-        fetch =
-            toServer Initial Api.getApiItem
-
         state =
-            { items = empty, addItemInput = "", error = Nothing }
+            { items = empty
+            , addItemInput = ""
+            , error = Nothing
+            , jwtToken = Nothing
+            }
+        fetch =
+            toProtectedServer state Initial Api.getApiItem
     in
         ( state, fetch )
 
@@ -61,12 +66,14 @@ type FromServer
     = Initial (List ItemId)
     | NewItem Item
     | Delete ItemId
+    | NewToken String
 
 
 type FromUi
     = AddItemInputChange String
     | AddItemButton
     | Done ItemId
+    | LoginButton
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -79,7 +86,7 @@ update message s =
                         cmd : Cmd Msg
                         cmd =
                             Cmd.batch
-                                <| List.map (toServer NewItem << getApiItemByItemId) itemIds
+                                <| List.map (toProtectedServer s NewItem << getApiItemByItemId) itemIds
                     in
                         ( s, cmd )
 
@@ -89,6 +96,9 @@ update message s =
                 Delete id ->
                     { s | items = remove id s.items } ! []
 
+                NewToken token ->
+                    { s | jwtToken = Just token } ! []
+
         FromUi fromUi ->
             case fromUi of
                 AddItemButton ->
@@ -97,7 +107,7 @@ update message s =
                             s.addItemInput
 
                         cmd =
-                            toServer (\id -> NewItem (Item id new)) (postApiItem new)
+                            toProtectedServer s (\id -> NewItem (Item id new)) (postApiItem new)
 
                         newState =
                             { s | addItemInput = "" }
@@ -113,7 +123,14 @@ update message s =
                 Done id ->
                     let
                         cmd =
-                            toServer (always (Delete id)) (deleteApiItemByItemId id)
+                            toProtectedServer s (always (Delete id)) (deleteApiItemByItemId id)
+                    in
+                        ( s, cmd )
+                LoginButton ->
+                    let
+                        cmd =
+                            toServer NewToken
+                              (postLogin (Login "Ali Baba" "Open Sesame"))
                     in
                         ( s, cmd )
 
@@ -121,18 +138,21 @@ update message s =
             ( { s | error = Just msg }, Cmd.none )
 
 
-
--- toServer : (a -> FromServer) -> Task Http.Error a -> Cmd Msg
--- toServer tag task =
---     perform (Error << toString) (FromServer << tag) task
-
-toServer : (a -> FromServer) -> Http.Request a -> Cmd Msg
+toServer : (a -> FromServer) -> HttpBuilder.RequestBuilder a -> Cmd Msg
 toServer tag req =
   let handleResult r = case r of
         Ok r -> FromServer <| tag r
         Err e -> Error <| toString e
-  in Http.send handleResult req
+  in HttpBuilder.send handleResult req
 
+toProtectedServer : Model -> (a -> FromServer) -> HttpBuilder.RequestBuilder a -> Cmd Msg
+toProtectedServer s tag req =
+  case s.jwtToken of
+    Nothing -> Cmd.none -- [todo] present login screen
+    Just token ->
+      let reqWithAuth = req
+            |> HttpBuilder.withHeader "Authorization" ("Bearer " ++ token)
+      in toServer tag reqWithAuth
 
 
 -- VIEW
@@ -147,6 +167,7 @@ view state =
         ++ (List.map (viewItem << snd) (toList state.items))
         ++ [ input [ onInput (FromUi << AddItemInputChange) ] []
            , button [ onClick (FromUi AddItemButton) ] [ text "add item" ]
+           , button [ onClick (FromUi LoginButton) ] [ text "login" ]
            ]
 
 

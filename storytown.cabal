@@ -32,6 +32,7 @@ executable server
     , bytestring
     , servant-auth
     , servant-auth-server
+    , bytestring
   other-modules:
       Api
       App
@@ -64,6 +65,7 @@ test-suite spec
     , bytestring
     , servant-auth
     , servant-auth-server
+    , bytestring
     , warp >= 3.2.3
     , hspec
     , servant-client

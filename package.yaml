@@ -21,6 +21,7 @@ dependencies:
   - bytestring
   - servant-auth
   - servant-auth-server
+  - bytestring
 
 executables:
   server:
