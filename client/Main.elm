@@ -62,6 +62,7 @@ type Msg
 
 type FromServer
     = ItemIds (List ItemId)
+    | ItemInfo Item
     | ForItemList IL.Msg
     | NewToken String
 
@@ -79,10 +80,16 @@ update message s =
                 ItemIds itemIds ->
                     s
                         ! List.map
-                            (toServerA s (ForItemList << IL.ItemAdded)
-                                << getApiItemByItemId
-                            )
+                            (toServerA s ItemInfo << getApiItemByItemId)
                             itemIds
+
+                ItemInfo i ->
+                    case s.nav of
+                        ItemListView v ->
+                            { s | nav = ItemListView <| IL.addItem i v } ! []
+
+                        _ ->
+                            { s | error = Just "No item list view! " } ! []
 
                 ForItemList forIL ->
                     case s.nav of
@@ -95,7 +102,11 @@ update message s =
                 NewToken token ->
                     { s
                       -- [problem] assumes token is always valid
-                        | nav = ItemListView IL.init
+                        | nav =
+                            ItemListView
+                                { items = Dict.empty
+                                , addItemInput = ""
+                                }
                         , jwtToken = Just token
                     }
                         ! [ toServerA s ItemIds Api.getApiItem ]
@@ -117,7 +128,7 @@ update message s =
                         IL.NewState m ->
                             ( { s | nav = ItemListView m }, Cmd.none )
 
-                        IL.AddItem m new ->
+                        IL.AddItem m new cb ->
                             if new == "" then
                                 update (Error "empty field") s
                             else
@@ -125,16 +136,16 @@ update message s =
                                 ( { s | nav = ItemListView m }
                                 , toServerA s
                                     (ForItemList
-                                        << IL.ItemAdded
+                                        << cb
                                         << flip Item new
                                     )
                                     (postApiItem new)
                                 )
 
-                        IL.DeleteItem m id ->
+                        IL.DeleteItem m id cb ->
                             ( { s | nav = ItemListView m }
                             , toServerA s
-                                (always <| ForItemList <| IL.ItemDeleted id)
+                                (always <| ForItemList <| cb id)
                                 (deleteApiItemByItemId id)
                             )
 

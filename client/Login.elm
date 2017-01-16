@@ -20,6 +20,10 @@ import Html
 
 
 type alias Model =
+    ModelInternal
+
+
+type alias ModelInternal =
     { usernameInput : String
     , passwordInput : String
     }

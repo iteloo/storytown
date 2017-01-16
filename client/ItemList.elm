@@ -3,12 +3,16 @@ module ItemList
         ( Model
         , init
         , ItemId
-        , Msg(..)
+        , Msg
         , update
         , view
         , Config
         , defaultConfig
         , DefaultTag(..)
+        , setItems
+        , addItem
+        , deleteItemWithId
+        , clearInput
         )
 
 import Debug exposing (..)
@@ -25,6 +29,10 @@ import Api exposing (Item)
 
 
 type alias Model =
+    ModelInternal
+
+
+type alias ModelInternal =
     { items : Dict.Dict Int Item
     , addItemInput : String
     }
@@ -69,13 +77,13 @@ updateInternal : Config msg -> MsgInternal -> Model -> msg
 updateInternal cfg msg s =
     case msg of
         AddItemButton ->
-            cfg.addItemTag s s.addItemInput
+            cfg.addItemTag s s.addItemInput ItemAdded
 
         AddItemInputChange t ->
             cfg.newStateTag { s | addItemInput = t }
 
         Done id ->
-            cfg.deleteItemTag s id
+            cfg.deleteItemTag s id ItemDeleted
 
 
 
@@ -110,23 +118,23 @@ viewItem tag item =
 
 type alias Config msg =
     { newStateTag : Model -> msg
-    , addItemTag : Model -> String -> msg
-    , deleteItemTag : Model -> ItemId -> msg
+    , addItemTag : Model -> String -> (Item -> Msg) -> msg
+    , deleteItemTag : Model -> ItemId -> (ItemId -> Msg) -> msg
     }
 
 
 defaultConfig : (DefaultTag -> msg) -> Config msg
 defaultConfig tag =
     { newStateTag = tag << NewState
-    , addItemTag = \m -> tag << AddItem m
-    , deleteItemTag = \m -> tag << DeleteItem m
+    , addItemTag = \m new -> tag << AddItem m new
+    , deleteItemTag = \m id -> tag << DeleteItem m id
     }
 
 
 type DefaultTag
     = NewState Model
-    | AddItem Model String
-    | DeleteItem Model ItemId
+    | AddItem Model String (Item -> Msg)
+    | DeleteItem Model ItemId (ItemId -> Msg)
 
 
 
