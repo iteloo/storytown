@@ -2,10 +2,9 @@ module Login
     exposing
         ( Model
         , init
-        , DefaultTag(..)
+        , Msg
+        , update
         , view
-        , Config
-        , defaultConfig
         )
 
 import Debug exposing (..)
@@ -14,6 +13,9 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import List
 import Html
+import Server exposing (toServer)
+import Http
+import Context exposing (Context)
 
 
 -- MODEL
@@ -39,55 +41,36 @@ init =
 -- UPDATE
 
 
-type MsgInternal
+type Msg
     = UsernameInputChange String
     | PasswordInputChange String
     | LoginButton
 
 
-updateInternal : Config msg -> MsgInternal -> Model -> msg
-updateInternal cfg msg s =
+update : Context -> Msg -> Model -> ( Model, Msg )
+update ctx msg s =
     case msg of
         LoginButton ->
-            cfg.submitTag s s.usernameInput s.passwordInput
+            s
+                ! [ toServer ctx.jwt NewToken <|
+                        Api.postLogin (Login s.usernameInput s.passwordInput)
+                  ]
 
         UsernameInputChange t ->
-            cfg.newStateTag { s | usernameInput = t }
+            { s | usernameInput = t } ! []
 
         PasswordInputChange t ->
-            cfg.newStateTag { s | passwordInput = t }
+            { s | passwordInput = t } ! []
 
 
 
 -- VIEW
 
 
-view : Config msg -> Model -> Html msg
+view : Model -> Html Msg
 view cfg s =
-    let
-        send =
-            flip (updateInternal cfg) s
-    in
-        div [] <|
-            [ input [ onInput (send << UsernameInputChange) ] []
-            , input [ onInput (send << PasswordInputChange) ] []
-            , button [ onClick (send LoginButton) ] [ text "login" ]
-            ]
-
-
-type alias Config msg =
-    { newStateTag : Model -> msg
-    , submitTag : Model -> String -> String -> msg
-    }
-
-
-defaultConfig : (DefaultTag -> msg) -> Config msg
-defaultConfig tag =
-    { newStateTag = tag << NewState
-    , submitTag = \m s -> tag << SubmitInfo m s
-    }
-
-
-type DefaultTag
-    = NewState Model
-    | SubmitInfo Model String String
+    div [] <|
+        [ input [ onInput UsernameInputChange ] []
+        , input [ onInput PasswordInputChange ] []
+        , button [ onClick LoginButton ] [ text "login" ]
+        ]

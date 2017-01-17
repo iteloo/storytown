@@ -6,9 +6,6 @@ module ItemList
         , Msg
         , update
         , view
-        , Config
-        , defaultConfig
-        , DefaultTag(..)
         , setItems
         , addItem
         , deleteItemWithId
@@ -23,6 +20,10 @@ import List
 import Html
 import Dict
 import Api exposing (Item)
+import Api
+import Server exposing (toServer)
+import Http
+import Context exposing (Context)
 
 
 -- MODEL
@@ -53,58 +54,69 @@ type alias ItemId =
 
 
 type Msg
-    = ItemAdded Item
-    | ItemDeleted ItemId
-
-
-type MsgInternal
     = AddItemInputChange String
     | AddItemButton
     | Done ItemId
+    | ItemAdded (Result Http.Error Item)
+    | ItemDeleted (Result Http.Error ItemId)
 
 
-update : Msg -> Model -> Model
-update msg s =
-    case msg of
-        ItemAdded item ->
-            clearInput <| addItem item s
-
-        ItemDeleted id ->
-            deleteItemWithId id s
-
-
-updateInternal : Config msg -> MsgInternal -> Model -> msg
-updateInternal cfg msg s =
+update : Context -> Msg -> Model -> ( Model, Cmd Msg )
+update ctx msg s =
     case msg of
         AddItemButton ->
-            cfg.addItemTag s s.addItemInput ItemAdded
+            let
+                new =
+                    s.addItemInput
+            in
+                if new == "" then
+                    -- [todo] add error for empty field
+                    s ! []
+                else
+                    s
+                        ! [ toServer ctx.jwt
+                                (ItemAdded << Result.map (flip Item new))
+                            <|
+                                Api.postApiItem new
+                          ]
 
         AddItemInputChange t ->
-            cfg.newStateTag { s | addItemInput = t }
+            { s | addItemInput = t } ! []
 
         Done id ->
-            cfg.deleteItemTag s id ItemDeleted
+            s
+                ! [ toServer ctx.jwt (ItemDeleted << Result.map (always id)) <|
+                        Api.deleteApiItemByItemId id
+                  ]
+
+        ItemAdded (Ok item) ->
+            (clearInput <| addItem item s) ! []
+
+        ItemAdded (Err e) ->
+            s ! []
+
+        ItemDeleted (Ok id) ->
+            deleteItemWithId id s ! []
+
+        ItemDeleted (Err e) ->
+            s ! []
 
 
 
 -- VIEW
 
 
-view : Config msg -> Model -> Html msg
-view cfg s =
-    let
-        send =
-            flip (updateInternal cfg) s
-    in
-        div [] <|
-            (List.map (viewItem (send << Done) << snd) (Dict.toList s.items))
-                ++ [ input
-                        [ value s.addItemInput
-                        , onInput (send << AddItemInputChange)
-                        ]
-                        []
-                   , button [ onClick (send AddItemButton) ] [ text "add item" ]
-                   ]
+view : Model -> Html Msg
+view s =
+    div [] <|
+        (List.map (viewItem Done << snd) (Dict.toList s.items))
+            ++ [ input
+                    [ value s.addItemInput
+                    , onInput AddItemInputChange
+                    ]
+                    []
+               , button [ onClick AddItemButton ] [ text "add item" ]
+               ]
 
 
 viewItem : (ItemId -> msg) -> Item -> Html msg
@@ -114,27 +126,6 @@ viewItem tag item =
         , text " - "
         , button [ onClick (tag item.id) ] [ text "done" ]
         ]
-
-
-type alias Config msg =
-    { newStateTag : Model -> msg
-    , addItemTag : Model -> String -> (Item -> Msg) -> msg
-    , deleteItemTag : Model -> ItemId -> (ItemId -> Msg) -> msg
-    }
-
-
-defaultConfig : (DefaultTag -> msg) -> Config msg
-defaultConfig tag =
-    { newStateTag = tag << NewState
-    , addItemTag = \m new -> tag << AddItem m new
-    , deleteItemTag = \m id -> tag << DeleteItem m id
-    }
-
-
-type DefaultTag
-    = NewState Model
-    | AddItem Model String (Item -> Msg)
-    | DeleteItem Model ItemId (ItemId -> Msg)
 
 
 

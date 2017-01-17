@@ -13,6 +13,7 @@ import List
 import Login
 import ItemList exposing (ItemId)
 import ItemList as IL
+import Server exposing (toServer)
 
 
 main : Program Never Model Msg
@@ -66,7 +67,6 @@ type FromServer
 
 type FromUi
     = FromLoginView Login.DefaultTag
-    | FromItemListView IL.DefaultTag
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -77,7 +77,7 @@ update message s =
                 ItemIds itemIds ->
                     s
                         ! List.map
-                            (toServerA s ItemInfo << getApiItemByItemId)
+                            (toServer s.jwt ItemInfo << getApiItemByItemId)
                             itemIds
 
                 ItemInfo i ->
@@ -92,7 +92,7 @@ update message s =
                         | itemList = IL.init
                         , jwt = Just token
                     }
-                        ! [ toServerA s ItemIds Api.getApiItem ]
+                        ! [ toServer s.jwt ItemIds Api.getApiItem ]
 
         FromUi fromUi ->
             case fromUi of
@@ -103,75 +103,11 @@ update message s =
 
                         Login.SubmitInfo m u p ->
                             ( { s | login = m }
-                            , toServer NewToken (postLogin (Login u p))
-                            )
-
-                FromItemListView fromItemListView ->
-                    case fromItemListView of
-                        IL.NewState m ->
-                            ( { s | itemList = m }, Cmd.none )
-
-                        IL.AddItem m new cb ->
-                            if new == "" then
-                                update (Error "empty field") s
-                            else
-                                -- maybe clear field
-                                ( { s | itemList = m }
-                                , toServerA s
-                                    (ForItemList
-                                        << cb
-                                        << flip Item new
-                                    )
-                                    (postApiItem new)
-                                )
-
-                        IL.DeleteItem m id cb ->
-                            ( { s | itemList = m }
-                            , toServerA s
-                                (always <| ForItemList <| cb id)
-                                (deleteApiItemByItemId id)
+                            , toServer s.jwt NewToken (postLogin (Login u p))
                             )
 
         Error msg ->
             ( { s | error = Just msg }, Cmd.none )
-
-
-
--- API HELPERS
-
-
-toServer : (a -> FromServer) -> HttpB.RequestBuilder a -> Cmd Msg
-toServer tag req =
-    let
-        handleResult r =
-            case r of
-                Ok r ->
-                    FromServer <| tag r
-
-                Err e ->
-                    Error <| toString e
-    in
-        HttpB.send handleResult req
-
-
-toServerA :
-    Model
-    -> (a -> FromServer)
-    -> HttpB.RequestBuilder a
-    -> Cmd Msg
-toServerA s tag req =
-    case s.jwt of
-        Nothing ->
-            -- [todo] present login screen
-            Cmd.none
-
-        Just token ->
-            let
-                reqWithAuth =
-                    req
-                        |> HttpB.withHeader "Authorization" ("Bearer " ++ token)
-            in
-                toServer tag reqWithAuth
 
 
 
@@ -185,12 +121,8 @@ view s =
         , br [] []
         , case s.jwt of
             Nothing ->
-                Login.view
-                    (Login.defaultConfig (FromUi << FromLoginView))
-                    s.login
+                Login.view s.login
 
             Just jwt ->
-                IL.view
-                    (IL.defaultConfig (FromUi << FromItemListView))
-                    s.itemList
+                IL.view s.itemList
         ]
