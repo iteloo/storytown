@@ -30,22 +30,19 @@ main =
 
 
 type alias Model =
-    { nav : Navigation
+    { login : Login.Model
+    , itemList : IL.Model
     , error : Maybe String
-    , jwtToken : Maybe String
+    , jwt : Maybe String
     }
-
-
-type Navigation
-    = LoginView Login.Model
-    | ItemListView IL.Model
 
 
 init : ( Model, Cmd Msg )
 init =
-    { nav = LoginView Login.init
+    { login = Login.init
+    , itemList = IL.init
     , error = Nothing
-    , jwtToken = Nothing
+    , jwt = Nothing
     }
         ! []
 
@@ -84,30 +81,16 @@ update message s =
                             itemIds
 
                 ItemInfo i ->
-                    case s.nav of
-                        ItemListView v ->
-                            { s | nav = ItemListView <| IL.addItem i v } ! []
-
-                        _ ->
-                            { s | error = Just "No item list view! " } ! []
+                    { s | itemList = IL.addItem i s.itemList } ! []
 
                 ForItemList forIL ->
-                    case s.nav of
-                        ItemListView v ->
-                            { s | nav = ItemListView <| IL.update forIL v } ! []
-
-                        _ ->
-                            { s | error = Just "No item list view! " } ! []
+                    { s | itemList = IL.update forIL s.itemList } ! []
 
                 NewToken token ->
                     { s
                       -- [problem] assumes token is always valid
-                        | nav =
-                            ItemListView
-                                { items = Dict.empty
-                                , addItemInput = ""
-                                }
-                        , jwtToken = Just token
+                        | itemList = IL.init
+                        , jwt = Just token
                     }
                         ! [ toServerA s ItemIds Api.getApiItem ]
 
@@ -116,24 +99,24 @@ update message s =
                 FromLoginView fromLoginView ->
                     case fromLoginView of
                         Login.NewState m ->
-                            ( { s | nav = LoginView m }, Cmd.none )
+                            ( { s | login = m }, Cmd.none )
 
                         Login.SubmitInfo m u p ->
-                            ( { s | nav = LoginView m }
+                            ( { s | login = m }
                             , toServer NewToken (postLogin (Login u p))
                             )
 
                 FromItemListView fromItemListView ->
                     case fromItemListView of
                         IL.NewState m ->
-                            ( { s | nav = ItemListView m }, Cmd.none )
+                            ( { s | itemList = m }, Cmd.none )
 
                         IL.AddItem m new cb ->
                             if new == "" then
                                 update (Error "empty field") s
                             else
                                 -- maybe clear field
-                                ( { s | nav = ItemListView m }
+                                ( { s | itemList = m }
                                 , toServerA s
                                     (ForItemList
                                         << cb
@@ -143,7 +126,7 @@ update message s =
                                 )
 
                         IL.DeleteItem m id cb ->
-                            ( { s | nav = ItemListView m }
+                            ( { s | itemList = m }
                             , toServerA s
                                 (always <| ForItemList <| cb id)
                                 (deleteApiItemByItemId id)
@@ -177,7 +160,7 @@ toServerA :
     -> HttpB.RequestBuilder a
     -> Cmd Msg
 toServerA s tag req =
-    case s.jwtToken of
+    case s.jwt of
         Nothing ->
             -- [todo] present login screen
             Cmd.none
@@ -200,14 +183,14 @@ view s =
     div [] <|
         [ text (toString s)
         , br [] []
-        , case s.nav of
-            LoginView model ->
+        , case s.jwt of
+            Nothing ->
                 Login.view
                     (Login.defaultConfig (FromUi << FromLoginView))
-                    model
+                    s.login
 
-            ItemListView model ->
+            Just jwt ->
                 IL.view
                     (IL.defaultConfig (FromUi << FromItemListView))
-                    model
+                    s.itemList
         ]
