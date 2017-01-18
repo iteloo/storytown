@@ -22,6 +22,8 @@ dependencies:
   - servant-auth
   - servant-auth-server
   - bytestring
+  - wai-cors
+  - http-types
 
 executables:
   server:

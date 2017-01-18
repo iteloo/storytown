@@ -89,7 +89,7 @@ update message s =
                     update (Error "Cannot parse path") s
 
                 Just route ->
-                    { s | history = parsePath loc :: s.history }
+                    { s | route = route, history = s.route :: s.history }
                         ! []
                         :> update (SetupRoute route)
 

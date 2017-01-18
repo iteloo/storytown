@@ -7,7 +7,6 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
-import           Api
 import           Elm                                 (ElmType (..), Spec (Spec),
                                                       specsToDir,
                                                       toElmDecoderSource,
@@ -18,23 +17,35 @@ import           GHC.TypeLits
 import           Servant.API
 import           Servant.Auth.Server
 import           Servant.Auth.Server.SetCookieOrphan ()
-import           Servant.Elm                         (ElmType, Proxy (Proxy),
+import           Servant.Elm                         (ElmOptions (..), ElmType,
+                                                      Proxy (Proxy),
                                                       defElmImports,
-                                                      generateElmForAPI)
+                                                      defElmOptions,
+                                                      generateElmForAPIWith)
 import           Servant.Elm.Internal.Foreign
 import           Servant.Foreign
 
 
-spec :: Spec
-spec = Spec ["Api"]
+import           Api
+import           Environment
+
+spec :: ElmOptions -> Spec
+spec opt =
+  Spec ["Api"]
             (defElmImports
              :  toElmTypeSource    (Proxy :: Proxy NoContent)
              :  toElmSource        (Proxy :: Proxy Login)
              ++ toElmSource        (Proxy :: Proxy Item)
-             ++ generateElmForAPI  (Proxy :: Proxy (SubAPI auths)))
+             ++ generateElmForAPIWith opt (Proxy :: Proxy (SubAPI auths)))
 
 main :: IO ()
-main = specsToDir [spec] "client"
+main = do
+  env <- readEnvWithDefault Development environmentEnvVar
+  let opt = case env of
+          Development -> defElmOptions { urlPrefix = "http://localhost:5000" }
+          Test        -> defElmOptions { urlPrefix = "http://localhost:5000" }
+          Production  -> defElmOptions
+  specsToDir [spec opt] "client"
 
 toElmSource (proxy :: Proxy a) =
   [ toElmTypeSource    proxy

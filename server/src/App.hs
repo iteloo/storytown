@@ -1,6 +1,8 @@
-{-# LANGUAGE DataKinds     #-}
-{-# LANGUAGE GADTs         #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators     #-}
+
 
 module App where
 
@@ -12,12 +14,14 @@ import           Control.Monad.Trans.Reader
 import qualified Data.ByteString.Lazy.Char8          as BS
 import qualified Database.Persist                    as DB
 import qualified Database.Persist.Postgresql         as DB
+import           Network.HTTP.Types.Header           (hAuthorization)
+import qualified Network.Wai.Middleware.Cors         as Cors
 import           Servant
 import           Servant.Auth.Server
 import           Servant.Auth.Server.SetCookieOrphan ()
-import           System.IO
 
 import           Api
+import           Environment
 
 
 data Config = Config {
@@ -25,8 +29,6 @@ data Config = Config {
   , env  :: Environment
 }
 
-data Environment = Development | Test | Production
-  deriving (Show, Read)
 
 startApp :: Config -> IO Application
 startApp cfg = do
@@ -40,7 +42,13 @@ startApp cfg = do
 
   DB.runSqlPool (DB.runMigration Api.migrateAll) (pool cfg)
 
-  return $ serveWithContext api ctx
+  let corsPolicy = Cors.simpleCorsResourcePolicy {
+          Cors.corsRequestHeaders = Cors.simpleHeaders ++ [ hAuthorization ]
+        , Cors.corsMethods = Cors.simpleMethods ++ [ "DELETE" ]
+        }
+  return
+    $ Cors.cors (const $ Just corsPolicy)
+    $ serveWithContext api ctx
     $ (enter (myHandlerToHandler cfg)
         $ server defaultCookieSettings jwtCfg)
       :<|> serveDirectory "assets"

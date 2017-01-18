@@ -1,5 +1,4 @@
 import           Network.Wai.Handler.Warp
-import           System.Environment
 import           System.IO
 
 import           Control.Monad.IO.Class               (liftIO)
@@ -9,11 +8,10 @@ import qualified Data.ByteString.Char8                as BS
 import           Database.Persist.Postgresql
 import           Network.Wai.Middleware.RequestLogger (logStdout, logStdoutDev)
 import           Options.Applicative
-import           Text.Read                            (readMaybe)
 import           Web.Heroku.Persist.Postgresql        (fromDatabaseUrl)
 
 import           App
-
+import           Environment
 
 main :: IO ()
 main = do
@@ -21,7 +19,7 @@ main = do
       ( fullDesc
      <> progDesc "Runs storytown server"
      <> header "storytown - build your language adventure" )
-  env <- readEnvWithDefault Development "ENVIRONMENT"
+  env <- readEnvWithDefault Development environmentEnvVar
   url <- unsafeLookupEnv "DATABASE_URL"
   let pgconf = case env of
           Development -> PostgresConf (BS.pack url) 1
@@ -56,22 +54,3 @@ appSettings = AppSettings
         <> showDefault
         <> value 3000
         <> metavar "INT" )
-
-
--- HELPERS
-
-unsafeReadEnv :: Read a => String -> IO a
-unsafeReadEnv env =
-  maybe
-    (fail $ "No " ++ env ++ " found!")
-    (maybe
-      (fail $ "Cannot read " ++ env ++ "!")
-      return
-      . readMaybe)
-  =<< lookupEnv env
-
-readEnvWithDefault :: Read a => a -> String -> IO a
-readEnvWithDefault def = fmap (maybe def id . (>>= readMaybe))  . lookupEnv
-
-unsafeLookupEnv env = lookupEnv env
-    >>= maybe (fail $ "No " ++ env ++ " found!") return

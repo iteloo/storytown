@@ -2,6 +2,7 @@ module View exposing (..)
 
 import Model exposing (Model)
 import Message exposing (Msg(..), ItemId)
+import Routing exposing (Route(..))
 import Api exposing (Item)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -14,11 +15,11 @@ view s =
     div [] <|
         [ text (toString s)
         , br [] []
-        , case s.jwt of
-            Nothing ->
+        , case s.route of
+            LoginPage ->
                 loginView
 
-            Just jwt ->
+            ItemListPage ->
                 itemsView s
         ]
 

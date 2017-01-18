@@ -1,7 +1,7 @@
 module Model exposing (Model, init)
 
 import Message exposing (Msg(..))
-import Routing exposing (Route)
+import Routing exposing (Route(..))
 import Api exposing (Item)
 import Dict
 import Navigation as Nav
@@ -19,7 +19,8 @@ type alias Model =
         -- CONTEXT
     , error : Maybe String
     , jwt : Maybe String
-    , history : List (Maybe Route)
+    , route : Route
+    , history : List Route
     }
 
 
@@ -30,7 +31,10 @@ init =
     , items = Dict.empty
     , addItemInput = ""
     , error = Nothing
-    , jwt = Nothing
+    , jwt =
+        Nothing
+        -- bogus value; will call update
+    , route = LoginPage
     , history = []
     }
         ! []
