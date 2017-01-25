@@ -7,6 +7,40 @@ version:        0.0.0
 build-type:     Simple
 cabal-version:  >= 1.10
 
+executable aws
+  main-is: Main.hs
+  hs-source-dirs:
+      trial/aws
+  build-depends:
+      base
+    , warp
+    , aeson
+    , wai-make-assets
+    , servant-elm
+    , servant
+    , wai
+    , servant-server
+    , transformers
+    , containers
+    , optparse-applicative
+    , persistent-postgresql
+    , persistent
+    , persistent-template
+    , heroku-persistent
+    , monad-logger
+    , wai-extra
+    , bytestring
+    , servant-auth
+    , servant-auth-server
+    , bytestring
+    , wai-cors
+    , http-types
+    , amazonka
+    , amazonka-s3
+    , lens
+    , time
+  default-language: Haskell2010
+
 executable server
   main-is: Main.hs
   hs-source-dirs:
@@ -35,6 +69,10 @@ executable server
     , bytestring
     , wai-cors
     , http-types
+    , amazonka
+    , amazonka-s3
+    , lens
+    , time
   other-modules:
       Api
       App
@@ -71,6 +109,10 @@ test-suite spec
     , bytestring
     , wai-cors
     , http-types
+    , amazonka
+    , amazonka-s3
+    , lens
+    , time
     , warp >= 3.2.3
     , hspec
     , servant-client

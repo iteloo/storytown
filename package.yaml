@@ -24,12 +24,20 @@ dependencies:
   - bytestring
   - wai-cors
   - http-types
+  - amazonka
+  - amazonka-s3
+  - lens
+  - time
 
 executables:
   server:
     main: Main.hs
     source-dirs:
       - server/src
+  aws:
+    main: Main.hs
+    source-dirs:
+      - trial/aws
 
 tests:
   spec:
