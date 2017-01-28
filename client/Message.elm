@@ -24,6 +24,10 @@ type Msg
     | AddItemInputChange String
     | AddItemButton
     | Done ItemId
+    | ToggleRecording ItemId
+    | StartRecording ItemId
+    | StopRecording
+    | FileReady String
       -- CONTEXT
     | Error String
     | UrlChange Nav.Location

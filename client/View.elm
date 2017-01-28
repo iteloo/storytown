@@ -1,6 +1,6 @@
 module View exposing (..)
 
-import Model exposing (Model)
+import Model exposing (Model, ItemData)
 import Message exposing (Msg(..), ItemId)
 import Routing exposing (Route(..))
 import Api exposing (Item)
@@ -33,24 +33,55 @@ loginView =
         ]
 
 
-itemsView { items, addItemInput } =
+itemsView { items, addItemInput, recordingId } =
+    let
+        toItemView ( itemid, item ) =
+            itemView
+                (case recordingId of
+                    Nothing ->
+                        False
+
+                    Just recId ->
+                        itemid == recId
+                )
+                item
+    in
+        div [] <|
+            (List.map toItemView (Dict.toList items))
+                ++ [ input
+                        [ value addItemInput
+                        , onInput AddItemInputChange
+                        ]
+                        []
+                   , button [ onClick AddItemButton ] [ text "add item" ]
+                   ]
+
+
+itemView : Bool -> ItemData -> Html Msg
+itemView recording item =
     div [] <|
-        (List.map (itemView Done << snd) (Dict.toList items))
-            ++ [ input
-                    [ value addItemInput
-                    , onInput AddItemInputChange
+        [ text (item.item.text)
+        , text " - "
+        , button [ onClick (Done item.item.id) ] [ text "done" ]
+        , button [ onClick (ToggleRecording item.item.id) ]
+            [ text
+                (if recording then
+                    "stop recording"
+                 else
+                    "start recording"
+                )
+            ]
+        , (case item.audioURL of
+            Nothing ->
+                text "No audio"
+
+            Just url ->
+                audio
+                    [ controls True
+                    , src url
                     ]
                     []
-               , button [ onClick AddItemButton ] [ text "add item" ]
-               ]
-
-
-itemView : (ItemId -> msg) -> Item -> Html msg
-itemView tag item =
-    div [] <|
-        [ text (item.text)
-        , text " - "
-        , button [ onClick (tag item.id) ] [ text "done" ]
+          )
         ]
 
 
