@@ -24,10 +24,12 @@ dependencies:
   - bytestring
   - wai-cors
   - http-types
-  - amazonka
-  - amazonka-s3
+  - amazonka == 1.4.3
+  - amazonka-s3 == 1.4.3
   - lens
   - time
+  - resourcet
+  - text
 
 executables:
   server:

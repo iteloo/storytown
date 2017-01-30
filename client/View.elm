@@ -1,6 +1,6 @@
 module View exposing (..)
 
-import Model exposing (Model, ItemData)
+import Model exposing (Model)
 import Message exposing (Msg(..), ItemId)
 import Routing exposing (Route(..))
 import Api exposing (Item)
@@ -57,13 +57,13 @@ itemsView { items, addItemInput, recordingId } =
                    ]
 
 
-itemView : Bool -> ItemData -> Html Msg
+itemView : Bool -> Item -> Html Msg
 itemView recording item =
     div [] <|
-        [ text (item.item.text)
+        [ text (item.text)
         , text " - "
-        , button [ onClick (Done item.item.id) ] [ text "done" ]
-        , button [ onClick (ToggleRecording item.item.id) ]
+        , button [ onClick (Done item.idKey) ] [ text "done" ]
+        , button [ onClick (ToggleRecording item.idKey) ]
             [ text
                 (if recording then
                     "stop recording"
@@ -71,7 +71,7 @@ itemView recording item =
                     "start recording"
                 )
             ]
-        , (case item.audioURL of
+        , (case item.audioUrl of
             Nothing ->
                 text "No audio"
 

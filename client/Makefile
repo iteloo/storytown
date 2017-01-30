@@ -7,8 +7,11 @@
 # ../assets/spelling.js: Spelling.elm Main.elm .
 	# elm make Spelling.elm --output ../assets/spelling.js
 
-../assets/main.js: Api.elm Main.elm .
-	elm make Main.elm --output ../assets/main.js
+# ../assets/main.js: Api.elm Main.elm .
+# 	elm make Main.elm --output ../assets/main.js
+
+../assets/index.html: Api.elm Main.elm .
+	elm make Main.elm --output ../assets/index.html
 
 run-tests: tests.js
 	node tests.js

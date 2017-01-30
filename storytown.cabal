@@ -35,10 +35,12 @@ executable aws
     , bytestring
     , wai-cors
     , http-types
-    , amazonka
-    , amazonka-s3
+    , amazonka == 1.4.3
+    , amazonka-s3 == 1.4.3
     , lens
     , time
+    , resourcet
+    , text
   default-language: Haskell2010
 
 executable server
@@ -69,10 +71,12 @@ executable server
     , bytestring
     , wai-cors
     , http-types
-    , amazonka
-    , amazonka-s3
+    , amazonka == 1.4.3
+    , amazonka-s3 == 1.4.3
     , lens
     , time
+    , resourcet
+    , text
   other-modules:
       Api
       App
@@ -109,10 +113,12 @@ test-suite spec
     , bytestring
     , wai-cors
     , http-types
-    , amazonka
-    , amazonka-s3
+    , amazonka == 1.4.3
+    , amazonka-s3 == 1.4.3
     , lens
     , time
+    , resourcet
+    , text
     , warp >= 3.2.3
     , hspec
     , servant-client

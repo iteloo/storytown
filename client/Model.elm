@@ -1,10 +1,9 @@
-module Model exposing (Model, ItemData, initItemData, init)
+module Model exposing (Model, init)
 
 import Message exposing (Msg(..), ItemId)
 import Routing exposing (Route(..))
 import Api exposing (Item)
 import Dict
-import Navigation as Nav
 
 
 type alias Model =
@@ -13,7 +12,7 @@ type alias Model =
     , passwordInput :
         String
         -- ITEM LIST
-    , items : Dict.Dict Int ItemData
+    , items : Dict.Dict Int Item
     , addItemInput : String
     , recordingId :
         Maybe ItemId
@@ -22,18 +21,6 @@ type alias Model =
     , jwt : Maybe String
     , route : Route
     , history : List Route
-    }
-
-
-type alias ItemData =
-    { item : Item
-    , audioURL : Maybe String
-    }
-
-
-initItemData item =
-    { item = item
-    , audioURL = Nothing
     }
 
 

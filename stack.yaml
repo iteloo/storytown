@@ -10,6 +10,12 @@ packages:
     git: https://www.github.com/iteloo/servant-elm
     commit: 70d6299f6c4f7b12ab4fd0b307ae860cd35c18eb
   extra-dep: True
+- location:
+    git: https://www.github.com/iteloo/amazonka
+    commit: 907e4d8
+  subdirs:
+  - core
+  extra-dep: True
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:

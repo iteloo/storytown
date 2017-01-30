@@ -27,6 +27,7 @@ import           Servant.Elm
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 DItem
     text String
+    audioUrl String Maybe
     deriving Show
 |]
 
@@ -34,12 +35,14 @@ type ItemId = Int64
 
 data Item
   = Item {
-    id   :: ItemId,
-    text :: String
+    idKey    :: ItemId,
+    text     :: String,
+    audioUrl :: Maybe String
   }
   deriving (Show, Eq, Generic)
 
 instance ToJSON Item
+instance FromJSON Item
 instance ElmType Item
 
 data User = User { name :: String, email :: String }
@@ -71,6 +74,10 @@ type Protected =
        "name" :> Get '[JSON] String
   :<|> "email" :> Get '[JSON] String
   :<|> "item" :> ItemApi
+  :<|> "s3" :> S3Api
+
+type S3Api =
+  Capture "dir" String :> Get '[JSON] String
 
 type Unprotected =
   "login"
@@ -81,4 +88,5 @@ type ItemApi =
        Get '[JSON] [ItemId]
   :<|> Capture "itemId" ItemId :> Get '[JSON] Item
   :<|> ReqBody '[JSON] String :> Post '[JSON] ItemId
+  :<|> ReqBody '[JSON] Item :> Put '[JSON] ItemId
   :<|> Capture "itemId" ItemId :> Delete '[JSON] NoContent

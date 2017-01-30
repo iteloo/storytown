@@ -2,6 +2,7 @@ module Message exposing (ItemId, Msg(..))
 
 import Api exposing (Item)
 import Routing exposing (Route)
+import MediaRecorder as MR
 import Navigation as Nav
 
 
@@ -16,6 +17,7 @@ type Msg
     | NewToken String
     | ItemAdded Item
     | ItemDeleted ItemId
+    | ItemUpdated ItemId
       -- LOGIN
     | UsernameInputChange String
     | PasswordInputChange String
@@ -27,10 +29,14 @@ type Msg
     | ToggleRecording ItemId
     | StartRecording ItemId
     | StopRecording
-    | FileReady String
+    | FileReady ( String, MR.Blob )
+    | S3SignedRequestAudio ItemId MR.Blob String
+    | S3UploadDone String ItemId
       -- CONTEXT
     | Error String
     | UrlChange Nav.Location
     | SetupRoute Route
     | GotoRoute Route
     | UnauthorizedError
+      -- TEST
+    | TestNativeStart (Result MR.Error ())
