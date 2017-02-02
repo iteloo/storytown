@@ -11,32 +11,35 @@ type alias ItemId =
 
 
 type Msg
-    = -- FROM SERVER
-      ItemIds (List ItemId)
-    | ItemInfo Item
-    | NewToken String
-    | ItemAdded Item
-    | ItemDeleted ItemId
-    | ItemUpdated ItemId
-      -- LOGIN
-    | UsernameInputChange String
+    = -- LOGIN: UI
+      UsernameInputChange String
     | PasswordInputChange String
     | LoginButton
-      -- ITEM LIST
+      -- LOGIN: SERVER
+    | NewToken String
+      -- ITEM LIST: UI
     | AddItemInputChange String
     | AddItemButton
     | Done ItemId
+      -- ITEM LIST: SERVER
+    | ItemIds (List ItemId)
+    | ItemInfo Item
+    | ItemAdded Item
+    | ItemDeleted ItemId
+    | ItemUpdated ItemId
+      -- ITEM LIST: AUDIO: UI
     | ToggleRecording ItemId
-    | StartRecording ItemId
-    | StopRecording
+      -- ITEM LIST: AUDIO: NATIVE
     | FileReady ( String, MR.Blob )
+      -- ITEM LIST: AUDIO: SERVER
     | S3SignedRequestAudio ItemId MR.Blob String
+      -- ITEM LIST: AUDIO: S3
     | S3UploadDone String ItemId
-      -- CONTEXT
-    | Error String
+      -- ROUTING
     | UrlChange Nav.Location
-    | SetupRoute Route
     | GotoRoute Route
+      -- ERROR
+    | Error String
     | UnauthorizedError
       -- TEST
     | TestNativeStart (Result MR.Error ())

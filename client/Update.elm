@@ -1,4 +1,4 @@
-module Update exposing (update)
+module Update exposing (update, urlChange)
 
 import Model exposing (Model, init)
 import Message exposing (Msg(..))
@@ -17,36 +17,13 @@ import Http
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message s =
     case message of
-        -- FROM SERVER
-        ItemIds itemIds ->
-            s
-                ! List.map
-                    (toServer s.jwt ItemInfo << Api.getApiItemByItemId)
-                    itemIds
+        -- LOGIN: UI
+        UsernameInputChange t ->
+            { s | usernameInput = t } ! []
 
-        ItemInfo i ->
-            { s | items = Dict.insert i.idKey i s.items } ! []
+        PasswordInputChange t ->
+            { s | passwordInput = t } ! []
 
-        NewToken token ->
-            -- [problem] assumes token is always valid
-            { s | jwt = Just token }
-                ! []
-                :> update (GotoRoute ItemListPage)
-
-        ItemAdded item ->
-            { s
-                | addItemInput = ""
-                , items = Dict.insert item.idKey item s.items
-            }
-                ! []
-
-        ItemDeleted id ->
-            { s | items = Dict.remove id s.items } ! []
-
-        ItemUpdated id ->
-            s ! []
-
-        -- LOGIN
         LoginButton ->
             s
                 ! [ toServer s.jwt
@@ -54,13 +31,17 @@ update message s =
                         (Api.postLogin (Login s.usernameInput s.passwordInput))
                   ]
 
-        UsernameInputChange t ->
-            { s | usernameInput = t } ! []
+        -- LOGIN: SERVER
+        NewToken token ->
+            -- [problem] assumes token is always valid
+            { s | jwt = Just token }
+                ! []
+                :> gotoRoute ItemListPage
 
-        PasswordInputChange t ->
-            { s | passwordInput = t } ! []
+        -- ITEM LIST: UI
+        AddItemInputChange t ->
+            { s | addItemInput = t } ! []
 
-        -- ITEM LIST
         AddItemButton ->
             let
                 new =
@@ -76,9 +57,6 @@ update message s =
                                 (Api.postApiItem new)
                           ]
 
-        AddItemInputChange t ->
-            { s | addItemInput = t } ! []
-
         Done id ->
             s
                 ! [ toServer s.jwt
@@ -86,38 +64,39 @@ update message s =
                         (Api.deleteApiItemByItemId id)
                   ]
 
-        ToggleRecording itemid ->
-            update
-                (case s.recordingId of
-                    Nothing ->
-                        StartRecording itemid
-
-                    Just itemid ->
-                        StopRecording
-                )
-                s
-
-        StartRecording itemid ->
-            -- [todo] adds error handling
-            { s | recordingId = Just itemid }
-                ! [ Task.attempt TestNativeStart (MR.start ()) ]
-
-        StopRecording ->
-            -- [note] don't set to false yet since we need to wait for file
+        -- ITEM LIST: SERVER
+        ItemIds itemIds ->
             s
-                ! [ Task.attempt
-                        (\r ->
-                            case r of
-                                Err e ->
-                                    Debug.crash
-                                        "audio file failed to be prepared"
+                ! List.map
+                    (toServer s.jwt ItemInfo << Api.getApiItemByItemId)
+                    itemIds
 
-                                Ok r ->
-                                    FileReady r
-                        )
-                        (MR.stop ())
-                  ]
+        ItemInfo i ->
+            { s | items = Dict.insert i.idKey i s.items } ! []
 
+        ItemAdded item ->
+            { s
+                | addItemInput = ""
+                , items = Dict.insert item.idKey item s.items
+            }
+                ! []
+
+        ItemDeleted id ->
+            { s | items = Dict.remove id s.items } ! []
+
+        ItemUpdated id ->
+            s ! []
+
+        -- ITEM LIST: AUDIO: UI
+        ToggleRecording itemid ->
+            case s.recordingId of
+                Nothing ->
+                    startRecording itemid s
+
+                Just itemid ->
+                    stopRecording s
+
+        -- ITEM LIST: AUDIO: NATIVE
         FileReady ( url, blob ) ->
             case s.recordingId of
                 Nothing ->
@@ -142,6 +121,7 @@ update message s =
                                     (Api.getApiS3ByDir "audio")
                               ]
 
+        -- ITEM LIST: AUDIO: SERVER
         S3SignedRequestAudio itemid blob reqUrl ->
             let
                 req =
@@ -173,6 +153,7 @@ update message s =
             in
                 s ! [ Http.send handleResult req ]
 
+        -- ITEM LIST: AUDIO: S3
         S3UploadDone baseUrl itemid ->
             case Dict.get itemid s.items of
                 Nothing ->
@@ -191,41 +172,89 @@ update message s =
                                     (Api.putApiItem newItem)
                                 ]
 
-        -- CONTEXT
-        Error msg ->
-            { s | error = Just msg } ! []
-
+        -- ROUTING
         UrlChange loc ->
-            case parsePath loc of
-                Nothing ->
-                    update (Error "Cannot parse path") s
-
-                Just route ->
-                    { s | route = route, history = s.route :: s.history }
-                        ! []
-                        :> update (SetupRoute route)
-
-        SetupRoute route ->
-            case route of
-                ItemListPage ->
-                    s ! [ toServer s.jwt ItemIds Api.getApiItem ]
-
-                LoginPage ->
-                    { s
-                        | usernameInput = ""
-                        , passwordInput = ""
-                    }
-                        ! []
+            urlChange loc s
 
         GotoRoute route ->
-            s ! [ Nav.newUrl <| makePath route ]
+            gotoRoute route s
 
         -- ERROR
+        Error msg ->
+            error msg s
+
         UnauthorizedError ->
-            update (Error "Unauthorized!") s
-                :> update (GotoRoute LoginPage)
+            error "Unauthorized!" s
+                :> gotoRoute LoginPage
 
         -- TEST
         -- [todo] do something nontrivial
         TestNativeStart runit ->
             s ! Debug.log "in TestNativeStart" []
+
+
+
+-- AUDIO
+
+
+startRecording itemid s =
+    -- [todo] adds error handling
+    { s | recordingId = Just itemid }
+        ! [ Task.attempt TestNativeStart (MR.start ()) ]
+
+
+stopRecording s =
+    -- [note] don't set to false yet since we need to wait for file
+    s
+        ! [ Task.attempt
+                (\r ->
+                    case r of
+                        Err e ->
+                            Debug.crash
+                                "audio file failed to be prepared"
+
+                        Ok r ->
+                            FileReady r
+                )
+                (MR.stop ())
+          ]
+
+
+
+-- ROUTING
+
+
+urlChange loc s =
+    case parsePath loc of
+        Nothing ->
+            error "Cannot parse path" s
+
+        Just route ->
+            { s | route = route, history = s.route :: s.history }
+                ! []
+                :> setupRoute route
+
+
+gotoRoute route s =
+    s ! [ Nav.newUrl <| makePath route ]
+
+
+setupRoute route s =
+    case route of
+        ItemListPage ->
+            s ! [ toServer s.jwt ItemIds Api.getApiItem ]
+
+        LoginPage ->
+            { s
+                | usernameInput = ""
+                , passwordInput = ""
+            }
+                ! []
+
+
+
+-- ERROR
+
+
+error msg s =
+    { s | error = Just msg } ! []
