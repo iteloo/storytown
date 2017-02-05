@@ -8,6 +8,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Dict
+import RemoteData as RD
 
 
 view : Model -> Html Msg
@@ -33,56 +34,72 @@ loginView =
         ]
 
 
-itemsView { items, addItemInput, recordingId } =
-    let
-        toItemView ( itemid, item ) =
-            itemView
-                (case recordingId of
+itemsView s =
+    div []
+        [ case s.items of
+            RD.NotAsked ->
+                br [] []
+
+            RD.Loading ->
+                text "Loading..."
+
+            RD.Failure e ->
+                text "Cannot load..."
+
+            RD.Success items ->
+                div [] <|
+                    List.map
+                        (\( _, item ) -> itemView s.recordingId item)
+                        (Dict.toList items)
+        , input
+            [ value s.addItemInput
+            , onInput AddItemInputChange
+            ]
+            []
+        , button [ onClick AddItemButton ] [ text "add item" ]
+        ]
+
+
+itemView mRecording wItem =
+    case wItem of
+        RD.NotAsked ->
+            br [] []
+
+        RD.Loading ->
+            text "Loading..."
+
+        RD.Failure e ->
+            text "Cannot load..."
+
+        RD.Success item ->
+            div [] <|
+                [ text (item.text)
+                , text " - "
+                , button [ onClick (DeleteButton item.idKey) ] [ text "x" ]
+                , case mRecording of
                     Nothing ->
-                        False
+                        button [ onClick (RecordButton item.idKey) ]
+                            [ text "start recording" ]
 
                     Just recId ->
-                        itemid == recId
-                )
-                item
-    in
-        div [] <|
-            (List.map toItemView (Dict.toList items))
-                ++ [ input
-                        [ value addItemInput
-                        , onInput AddItemInputChange
-                        ]
-                        []
-                   , button [ onClick AddItemButton ] [ text "add item" ]
-                   ]
+                        if recId == item.idKey then
+                            button [ onClick (RecordButton item.idKey) ]
+                                [ text "stop recording" ]
+                        else
+                            button [ disabled True ]
+                                [ text "start recording" ]
+                , (case item.audioUrl of
+                    Nothing ->
+                        text "No audio"
 
-
-itemView : Bool -> Item -> Html Msg
-itemView recording item =
-    div [] <|
-        [ text (item.text)
-        , text " - "
-        , button [ onClick (Done item.idKey) ] [ text "done" ]
-        , button [ onClick (ToggleRecording item.idKey) ]
-            [ text
-                (if recording then
-                    "stop recording"
-                 else
-                    "start recording"
-                )
-            ]
-        , (case item.audioUrl of
-            Nothing ->
-                text "No audio"
-
-            Just url ->
-                audio
-                    [ controls True
-                    , src url
-                    ]
-                    []
-          )
-        ]
+                    Just url ->
+                        audio
+                            [ controls True
+                            , src url
+                            ]
+                            []
+                  )
+                ]
 
 
 snd ( _, b ) =

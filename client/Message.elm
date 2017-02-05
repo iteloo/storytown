@@ -1,13 +1,19 @@
-module Message exposing (ItemId, Msg(..))
+module Message exposing (ItemId, Web, Msg(..))
 
 import Api exposing (Item)
 import Routing exposing (Route)
 import MediaRecorder as MR
 import Navigation as Nav
+import RemoteData as RD
+import Http
 
 
 type alias ItemId =
     Int
+
+
+type alias Web a =
+    RD.RemoteData () a
 
 
 type Msg
@@ -20,15 +26,15 @@ type Msg
       -- ITEM LIST: UI
     | AddItemInputChange String
     | AddItemButton
-    | Done ItemId
+    | DeleteButton ItemId
       -- ITEM LIST: SERVER
-    | ItemIds (List ItemId)
-    | ItemInfo Item
-    | ItemAdded Item
+    | ItemIds (Web (List ItemId))
+    | ItemInfo ItemId (Web Item)
+    | ItemAdded String ItemId
     | ItemDeleted ItemId
     | ItemUpdated ItemId
       -- ITEM LIST: AUDIO: UI
-    | ToggleRecording ItemId
+    | RecordButton ItemId
       -- ITEM LIST: AUDIO: NATIVE
     | FileReady ( String, MR.Blob )
       -- ITEM LIST: AUDIO: SERVER

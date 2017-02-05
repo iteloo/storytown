@@ -1,9 +1,10 @@
 module Model exposing (Model, init)
 
-import Message exposing (Msg(..), ItemId)
+import Message exposing (Msg(..), Web, ItemId)
 import Routing exposing (Route(..))
 import Api exposing (Item)
 import Dict
+import RemoteData as RD
 
 
 type alias Model =
@@ -12,12 +13,14 @@ type alias Model =
     , passwordInput :
         String
         -- ITEM LIST
-    , items : Dict.Dict Int Item
+    , items : Web (Dict.Dict Int (Web Item))
     , addItemInput : String
     , recordingId :
         Maybe ItemId
+        -- ERROR
+    , error :
+        Maybe String
         -- CONTEXT
-    , error : Maybe String
     , jwt : Maybe String
     , route : Route
     , history : List Route
@@ -28,7 +31,7 @@ init : ( Model, Cmd Msg )
 init =
     { usernameInput = ""
     , passwordInput = ""
-    , items = Dict.empty
+    , items = RD.NotAsked
     , addItemInput = ""
     , recordingId = Nothing
     , error = Nothing

@@ -3,7 +3,8 @@ module Update exposing (update, urlChange)
 import Model exposing (Model, init)
 import Message exposing (Msg(..))
 import Routing exposing (Route(..), parsePath, makePath)
-import Server exposing (toServer)
+import Server
+import S3
 import Api exposing (Item, Login)
 import MediaRecorder as MR
 import List
@@ -12,6 +13,7 @@ import Navigation as Nav
 import Update.Extra.Infix exposing ((:>))
 import Task
 import Http
+import RemoteData as RD
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -26,7 +28,7 @@ update message s =
 
         LoginButton ->
             s
-                ! [ toServer s.jwt
+                ! [ Server.send s.jwt
                         NewToken
                         (Api.postLogin (Login s.usernameInput s.passwordInput))
                   ]
@@ -52,43 +54,55 @@ update message s =
                     s ! []
                 else
                     s
-                        ! [ toServer s.jwt
-                                (\id -> ItemAdded <| Item id new Nothing)
+                        ! [ Server.send s.jwt
+                                (ItemAdded new)
                                 (Api.postApiItem new)
                           ]
 
-        Done id ->
+        DeleteButton idKey ->
             s
-                ! [ toServer s.jwt
-                        (ItemDeleted << always id)
-                        (Api.deleteApiItemByItemId id)
+                ! [ Server.send s.jwt
+                        (ItemDeleted << always idKey)
+                        (Api.deleteApiItemByItemId idKey)
                   ]
 
         -- ITEM LIST: SERVER
-        ItemIds itemIds ->
-            s
-                ! List.map
-                    (toServer s.jwt ItemInfo << Api.getApiItemByItemId)
-                    itemIds
+        ItemIds wItemIds ->
+            RD.update
+                (\ids ->
+                    (Dict.fromList <| List.map (\i -> ( i, RD.Loading )) ids)
+                        ! List.map
+                            (\idKey ->
+                                Server.sendW s.jwt
+                                    (ItemInfo idKey)
+                                    (Api.getApiItemByItemId idKey)
+                            )
+                            ids
+                )
+                wItemIds
+                |> \( wItems, cmd ) -> { s | items = wItems } ! [ cmd ]
 
-        ItemInfo i ->
-            { s | items = Dict.insert i.idKey i s.items } ! []
+        ItemInfo idKey wItem ->
+            { s | items = RD.map (Dict.insert idKey wItem) s.items } ! []
 
-        ItemAdded item ->
+        ItemAdded text itemId ->
             { s
                 | addItemInput = ""
-                , items = Dict.insert item.idKey item s.items
+                , items =
+                    RD.map
+                        (Dict.insert itemId <| RD.succeed <| Item itemId text Nothing)
+                        s.items
             }
                 ! []
 
-        ItemDeleted id ->
-            { s | items = Dict.remove id s.items } ! []
+        ItemDeleted idKey ->
+            { s | items = RD.map (Dict.remove idKey) s.items } ! []
 
-        ItemUpdated id ->
+        ItemUpdated _ ->
             s ! []
 
         -- ITEM LIST: AUDIO: UI
-        ToggleRecording itemid ->
+        RecordButton itemid ->
             case s.recordingId of
                 Nothing ->
                     startRecording itemid s
@@ -103,74 +117,83 @@ update message s =
                     Debug.crash "This branch should not exist"
 
                 Just itemid ->
-                    let
-                        update item =
-                            { item | audioUrl = Just url }
-                    in
-                        { s
-                            | recordingId = Nothing
-                            , items =
-                                Dict.update
+                    { s
+                        | recordingId = Nothing
+                        , items =
+                            RD.map
+                                (Dict.update
                                     itemid
-                                    (Maybe.map update)
-                                    s.items
-                        }
-                            ! [ toServer
-                                    s.jwt
-                                    (S3SignedRequestAudio itemid blob)
-                                    (Api.getApiS3ByDir "audio")
-                              ]
+                                    (Maybe.map
+                                        (RD.map
+                                            (\item ->
+                                                { item | audioUrl = Just url }
+                                            )
+                                        )
+                                    )
+                                )
+                                s.items
+                    }
+                        ! [ Server.send
+                                s.jwt
+                                (S3SignedRequestAudio itemid blob)
+                                (Api.getApiS3ByDir "audio")
+                          ]
 
         -- ITEM LIST: AUDIO: SERVER
         S3SignedRequestAudio itemid blob reqUrl ->
-            let
-                req =
-                    Http.request
-                        { method = "PUT"
-                        , headers = []
-                        , url = reqUrl
-                        , body = MR.blobBody blob
-                        , expect = Http.expectStringResponse (\_ -> Ok ())
-                        , timeout = Nothing
-                        , withCredentials = False
-                        }
-
-                baseUrl =
-                    case List.head <| String.split "?" reqUrl of
-                        Nothing ->
-                            Debug.crash ("no base url! :" ++ reqUrl)
-
-                        Just url ->
-                            url
-
-                handleResult r =
-                    case r of
-                        Ok () ->
-                            S3UploadDone baseUrl itemid
-
-                        Err e ->
-                            Debug.crash "s3 failed!"
-            in
-                s ! [ Http.send handleResult req ]
+            s
+                ! [ S3.send
+                        (always
+                            (S3UploadDone
+                                (S3.baseUrlFromSignedUrl reqUrl)
+                                itemid
+                            )
+                        )
+                        (S3.putObject reqUrl blob)
+                  ]
 
         -- ITEM LIST: AUDIO: S3
         S3UploadDone baseUrl itemid ->
-            case Dict.get itemid s.items of
-                Nothing ->
-                    Debug.crash ("missing item with id: " ++ toString itemid)
+            let
+                newItems =
+                    RD.map
+                        (Dict.update
+                            itemid
+                            (Maybe.map
+                                (RD.map
+                                    (\item -> { item | audioUrl = Just baseUrl })
+                                )
+                            )
+                        )
+                        s.items
 
-                Just item ->
-                    let
-                        newItem =
-                            { item | audioUrl = Just baseUrl }
-                    in
-                        { s | items = Dict.insert itemid newItem s.items }
-                            ! Debug.log "upload done!"
-                                [ toServer
-                                    s.jwt
-                                    ItemUpdated
-                                    (Api.putApiItem newItem)
-                                ]
+                ( wItems, cmd ) =
+                    s.items
+                        |> RD.update
+                            (\items ->
+                                case Dict.get itemid items of
+                                    Nothing ->
+                                        Debug.crash ("missing item with id: " ++ toString itemid)
+
+                                    Just wItem ->
+                                        wItem
+                                            |> RD.update
+                                                (\item ->
+                                                    let
+                                                        newItem =
+                                                            { item | audioUrl = Just baseUrl }
+                                                    in
+                                                        Dict.insert itemid (RD.succeed newItem) items
+                                                            ! Debug.log "upload done!"
+                                                                [ Server.send
+                                                                    s.jwt
+                                                                    ItemUpdated
+                                                                    (Api.putApiItem newItem)
+                                                                ]
+                                                )
+                            )
+            in
+                { s | items = wItems |> RD.andThen identity } ! [ cmd ]
 
         -- ROUTING
         UrlChange loc ->
@@ -242,7 +265,8 @@ gotoRoute route s =
 setupRoute route s =
     case route of
         ItemListPage ->
-            s ! [ toServer s.jwt ItemIds Api.getApiItem ]
+            { s | items = RD.Loading }
+                ! [ Server.sendW s.jwt ItemIds Api.getApiItem ]
 
         LoginPage ->
             { s
