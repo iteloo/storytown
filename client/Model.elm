@@ -1,6 +1,5 @@
-module Model exposing (Model, init)
+module Model exposing (Model, init, ItemId, Web, PlaybackState(..), ItemState)
 
-import Message exposing (Msg(..), Web, ItemId)
 import Routing exposing (Route(..))
 import Api exposing (Item)
 import Dict
@@ -17,6 +16,9 @@ type alias Model =
     , addItemInput : String
     , recordingId :
         Maybe ItemId
+        -- PLAYBACK
+    , playbackState :
+        PlaybackState
         -- ERROR
     , error :
         Maybe String
@@ -27,13 +29,14 @@ type alias Model =
     }
 
 
-init : ( Model, Cmd Msg )
+init : Model
 init =
     { usernameInput = ""
     , passwordInput = ""
     , items = RD.NotAsked
     , addItemInput = ""
     , recordingId = Nothing
+    , playbackState = Stopped
     , error = Nothing
     , jwt =
         Nothing
@@ -41,4 +44,21 @@ init =
     , route = LoginPage
     , history = []
     }
-        ! []
+
+
+type alias ItemId =
+    Int
+
+
+type alias Web a =
+    RD.RemoteData () a
+
+
+type PlaybackState
+    = Stopped
+    | Paused ItemState
+    | Playing ItemState
+
+
+type alias ItemState =
+    { active : ItemId }

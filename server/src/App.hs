@@ -106,7 +106,7 @@ getSignedPutObjectRequest :: String -> MyHandler String
 getSignedPutObjectRequest dir = do
   ts <- liftIO Time.getCurrentTime
   let posix = show $ fromEnum $ Time.utcTimeToPOSIXSeconds ts
-  let objectkey = ObjectKey $ Text.pack $ dir ++ "/" ++ posix
+  let objectkey = ObjectKey $ Text.pack $ dir ++ "/" ++ posix ++ ".ogg"
   -- [hack] uploads some random file, to be overwritten by actual
   b <- liftIO $ chunkedFile 2048 "stack.yaml"
   let req = putObject "storytown-bucket" objectkey b

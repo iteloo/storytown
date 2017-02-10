@@ -1,11 +1,12 @@
 module Update exposing (update, urlChange)
 
-import Model exposing (Model, init)
+import Model exposing (Model, init, PlaybackState(..))
 import Message exposing (Msg(..))
 import Routing exposing (Route(..), parsePath, makePath)
 import Server
 import S3
 import Api exposing (Item, Login)
+import Audio
 import MediaRecorder as MR
 import List
 import Dict
@@ -90,7 +91,10 @@ update message s =
                 | addItemInput = ""
                 , items =
                     RD.map
-                        (Dict.insert itemId <| RD.succeed <| Item itemId text Nothing)
+                        (Dict.insert itemId <|
+                            RD.succeed <|
+                                Item itemId text Nothing
+                        )
                         s.items
             }
                 ! []
@@ -155,45 +159,58 @@ update message s =
         -- ITEM LIST: AUDIO: S3
         S3UploadDone baseUrl itemid ->
             let
-                newItems =
-                    RD.map
-                        (Dict.update
-                            itemid
-                            (Maybe.map
-                                (RD.map
-                                    (\item -> { item | audioUrl = Just baseUrl })
-                                )
-                            )
-                        )
-                        s.items
-
                 ( wItems, cmd ) =
-                    s.items
-                        |> RD.update
-                            (\items ->
-                                case Dict.get itemid items of
-                                    Nothing ->
-                                        Debug.crash ("missing item with id: " ++ toString itemid)
+                    s.items |> RD.update updateItems
 
-                                    Just wItem ->
-                                        wItem
-                                            |> RD.update
-                                                (\item ->
-                                                    let
-                                                        newItem =
-                                                            { item | audioUrl = Just baseUrl }
-                                                    in
-                                                        Dict.insert itemid (RD.succeed newItem) items
-                                                            ! Debug.log "upload done!"
-                                                                [ Server.send
-                                                                    s.jwt
-                                                                    ItemUpdated
-                                                                    (Api.putApiItem newItem)
-                                                                ]
-                                                )
-                            )
+                updateItems items =
+                    case Dict.get itemid items of
+                        Nothing ->
+                            Debug.crash
+                                ("missing item with id: " ++ toString itemid)
+
+                        Just wItem ->
+                            wItem |> RD.update (updateItem items)
+
+                updateItem items item =
+                    let
+                        newItem =
+                            { item | audioUrl = Just baseUrl }
+                    in
+                        Dict.insert itemid (RD.succeed newItem) items
+                            ! [ Server.send s.jwt
+                                    ItemUpdated
+                                    (Api.putApiItem newItem)
+                              ]
             in
                 { s | items = wItems |> RD.andThen identity } ! [ cmd ]
+
+        -- PLAYBACK
+        PlayButton ->
+            case s.playbackState of
+                Stopped ->
+                    s ! [ Audio.play () ]
+
+                Paused i ->
+                    s ! [ Audio.play () ]
+
+                Playing i ->
+                    s ! [ Audio.pause () ]
+
+        RewindButton ->
+            s ! [ Audio.rewind () ]
+
+        FastForwardButton ->
+            s ! []
+
+        AudioStarted runit ->
+            -- [problem] doesn't handle error
+            s ! []
+
+        Rewinded runit ->
+            s ! []
+
+        PlaybackStateChanged ps ->
+            { s | playbackState = ps } ! []
 
         -- ROUTING
         UrlChange loc ->

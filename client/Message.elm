@@ -1,19 +1,12 @@
-module Message exposing (ItemId, Web, Msg(..))
+module Message exposing (Msg(..))
 
+import Model exposing (Web, ItemId, PlaybackState)
 import Api exposing (Item)
 import Routing exposing (Route)
 import MediaRecorder as MR
 import Navigation as Nav
 import RemoteData as RD
 import Http
-
-
-type alias ItemId =
-    Int
-
-
-type alias Web a =
-    RD.RemoteData () a
 
 
 type Msg
@@ -41,6 +34,13 @@ type Msg
     | S3SignedRequestAudio ItemId MR.Blob String
       -- ITEM LIST: AUDIO: S3
     | S3UploadDone String ItemId
+      -- PLAYBACKj
+    | PlayButton
+    | RewindButton
+    | FastForwardButton
+    | AudioStarted (Result () ())
+    | Rewinded (Result () ())
+    | PlaybackStateChanged PlaybackState
       -- ROUTING
     | UrlChange Nav.Location
     | GotoRoute Route

@@ -1,7 +1,7 @@
 module View exposing (..)
 
-import Model exposing (Model)
-import Message exposing (Msg(..), ItemId)
+import Model exposing (Model, ItemId, PlaybackState(..))
+import Message exposing (Msg(..))
 import Routing exposing (Route(..))
 import Api exposing (Item)
 import Html exposing (..)
@@ -16,6 +16,7 @@ view s =
     div [] <|
         [ text (toString s)
         , br [] []
+        , playbackView s
         , case s.route of
             LoginPage ->
                 loginView
@@ -100,6 +101,26 @@ itemView mRecording wItem =
                             []
                   )
                 ]
+
+
+playbackView s =
+    div []
+        [ button [ onClick PlayButton ]
+            [ text
+                (case s.playbackState of
+                    Stopped ->
+                        "Play"
+
+                    Paused _ ->
+                        "Resume"
+
+                    Playing _ ->
+                        "Pause"
+                )
+            ]
+        , button [ onClick RewindButton ] [ text "<<" ]
+        , button [ onClick FastForwardButton ] [ text ">>" ]
+        ]
 
 
 snd ( _, b ) =

@@ -1,0 +1,70 @@
+<div id="main"></div>
+<script src="main.js"></script>
+<script src="BufferLoader.js"></script>
+<script>
+  var app = Elm.Main.fullscreen();
+
+  var context = new AudioContext();
+  var buffer;
+  var timestamps = [];
+  var curSource;
+  var lastStart;
+
+  function appendBuffer(buffer1, buffer2) {
+    var numberOfChannels = Math.min( buffer1.numberOfChannels, buffer2.numberOfChannels );
+    var tmp = context.createBuffer( numberOfChannels, (buffer1.length + buffer2.length), buffer1.sampleRate );
+    for (var i=0; i<numberOfChannels; i++) {
+      var channel = tmp.getChannelData(i);
+      channel.set( buffer1.getChannelData(i), 0);
+      channel.set( buffer2.getChannelData(i), buffer1.length);
+    }
+    return tmp;
+  };
+
+  app.ports.play.subscribe(e => {
+    if (context.state == "suspended") {
+      context.resume();
+      callback(scheduler.succeed([]));
+    } else {
+      let finishedLoading = bufferList => {
+        let source = context.createBufferSource();
+        buffer = bufferList.reduce(appendBuffer);
+        timestamps = bufferList.reduce((ts, buf) => {
+          return ts.concat([ buf.duration + ts[ts.length-1] ])
+        },[0]).slice(0,-1);
+        source.buffer = buffer;
+        source.connect(context.destination);
+        curSource = source;
+        source.start(0);
+      };
+      let bufferLoader = new BufferLoader(
+        context
+        , [ 'https://upload.wikimedia.org/wikipedia/commons/4/4f/Hu-ad%C3%B3.ogg'
+          , 'https://upload.wikimedia.org/wikipedia/commons/d/d3/Hu-adni.ogg'
+          , 'https://upload.wikimedia.org/wikipedia/commons/f/fe/Hu-adekv%C3%A1t.ogg'
+          ]
+        , finishedLoading
+      );
+      bufferLoader.load();
+    }
+  })
+
+  app.ports.pause.subscribe(e => {
+    context.suspend();
+  })
+
+  app.ports.rewind.subscribe(e => {
+    let next_i = timestamps.findIndex(t => lastStart+t > context.currentTime-0.4)
+    let t = next_i == -1 ? timestamps[timestamps.length-1] : timestamps[next_i]
+    let source = context.createBufferSource(buffer);
+    source.buffer = buffer;
+    source.connect(context.destination);
+    curSource.stop();
+    curSource = source;
+    source.start(lastStart = context.currentTime,t);
+  })
+
+  app.ports.fastfoward.subscribe(e => {
+  })
+
+</script>

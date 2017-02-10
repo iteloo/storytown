@@ -1,6 +1,7 @@
 module Server exposing (send, sendW)
 
-import Message exposing (Msg(..), Web)
+import Message exposing (Msg(..))
+import Model exposing (Web)
 import Http
 import HttpBuilder as HttpB
 import RemoteData as RD

@@ -6,7 +6,8 @@ module S3
         , baseUrlFromSignedUrl
         )
 
-import Message exposing (Msg(..), Web)
+import Model exposing (Web)
+import Message exposing (Msg(..))
 import Http
 import HttpBuilder as HttpB
 import RemoteData as RD
