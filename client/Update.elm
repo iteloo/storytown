@@ -1,6 +1,13 @@
 module Update exposing (update, urlChange)
 
-import Model exposing (Model, init, PlaybackState(..))
+import Model
+    exposing
+        ( Model
+        , init
+        , PlaybackState(..)
+        , duration
+        , currentItemState
+        )
 import Message exposing (Msg(..))
 import Routing exposing (Route(..), parsePath, makePath)
 import Server
@@ -15,6 +22,9 @@ import Update.Extra.Infix exposing ((:>))
 import Task
 import Http
 import RemoteData as RD
+import Time
+import Process
+import List.Zipper as Zipper
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -67,6 +77,9 @@ update message s =
                         (Api.deleteApiItemByItemId idKey)
                   ]
 
+        TextClicked itemId ->
+            s ! [ Audio.jumpTo itemId ]
+
         -- ITEM LIST: SERVER
         ItemIds wItemIds ->
             RD.update
@@ -84,7 +97,45 @@ update message s =
                 |> \( wItems, cmd ) -> { s | items = wItems } ! [ cmd ]
 
         ItemInfo idKey wItem ->
-            { s | items = RD.map (Dict.insert idKey wItem) s.items } ! []
+            let
+                wItems =
+                    RD.map (Dict.insert idKey wItem) s.items
+            in
+                { s | items = wItems }
+                    ! case
+                        RD.toMaybe wItems
+                            |> Maybe.andThen
+                                (\items ->
+                                    sequenceMaybe
+                                        (List.map RD.toMaybe
+                                            (Dict.values items)
+                                        )
+                                )
+                      of
+                        Nothing ->
+                            []
+
+                        Just items ->
+                            case
+                                sequenceMaybe
+                                    (List.map
+                                        (\i ->
+                                            (i.audioUrl
+                                                |> Maybe.andThen
+                                                    (\url ->
+                                                        Just
+                                                            ( url, i.idKey )
+                                                    )
+                                            )
+                                        )
+                                        items
+                                    )
+                            of
+                                Nothing ->
+                                    []
+
+                                Just iteminfo ->
+                                    [ Audio.load iteminfo ]
 
         ItemAdded text itemId ->
             { s
@@ -187,20 +238,23 @@ update message s =
         -- PLAYBACK
         PlayButton ->
             case s.playbackState of
-                Stopped ->
+                NotLoaded ->
+                    s ! Debug.log "button should've been disabled" []
+
+                Stopped _ ->
                     s ! [ Audio.play () ]
 
-                Paused i ->
+                Paused _ _ _ ->
                     s ! [ Audio.play () ]
 
-                Playing i ->
+                Playing _ _ _ ->
                     s ! [ Audio.pause () ]
 
         RewindButton ->
             s ! [ Audio.rewind () ]
 
         FastForwardButton ->
-            s ! []
+            s ! [ Audio.fastforward () ]
 
         AudioStarted runit ->
             -- [problem] doesn't handle error
@@ -210,7 +264,43 @@ update message s =
             s ! []
 
         PlaybackStateChanged ps ->
-            { s | playbackState = ps } ! []
+            { s | playbackState = ps }
+                ! [ case ps of
+                        Playing cnt ct ts ->
+                            case currentItemState ps of
+                                Nothing ->
+                                    Debug.log "no item found" Cmd.none
+
+                                Just i ->
+                                    delay (i.end - ct) (NextSentence cnt)
+
+                        _ ->
+                            Cmd.none
+                  ]
+
+        NextSentence cnt ->
+            case s.playbackState of
+                Playing old_cnt old_ct ts ->
+                    if cnt == old_cnt then
+                        case
+                            -- next item
+                            List.head
+                                (List.filter
+                                    (\i -> i.start > old_ct)
+                                    ts
+                                )
+                        of
+                            Nothing ->
+                                s ! Debug.log "no item found" []
+
+                            Just i ->
+                                { s | playbackState = Playing cnt i.start ts }
+                                    ! [ delay (duration i) (NextSentence cnt) ]
+                    else
+                        s ! []
+
+                _ ->
+                    s ! []
 
         -- ROUTING
         UrlChange loc ->
@@ -299,3 +389,28 @@ setupRoute route s =
 
 error msg s =
     { s | error = Just msg } ! []
+
+
+
+-- HELPERS
+
+
+delay : Time.Time -> msg -> Cmd msg
+delay time msg =
+    Process.sleep time
+        |> Task.andThen (always <| Task.succeed msg)
+        |> Task.perform identity
+
+
+sequenceMaybe : List (Maybe a) -> Maybe (List a)
+sequenceMaybe =
+    List.foldr
+        (\m -> Maybe.andThen (\l -> Maybe.map (flip (::) l) m))
+        (Just [])
+
+
+testUrls =
+    [ "https://upload.wikimedia.org/wikipedia/commons/4/4f/Hu-ad%C3%B3.ogg"
+    , "https://upload.wikimedia.org/wikipedia/commons/d/d3/Hu-adni.ogg"
+    , "https://upload.wikimedia.org/wikipedia/commons/f/fe/Hu-adekv%C3%A1t.ogg"
+    ]

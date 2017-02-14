@@ -1,7 +1,12 @@
 port module Audio exposing (..)
 
-import Model exposing (PlaybackState(..), ItemState)
+import Model exposing (PlaybackState(..), PlaybackItemState, ItemId)
 import Json.Decode as D
+import List.Zipper exposing (Zipper(..))
+import Time
+
+
+port load : List ( String, ItemId ) -> Cmd msg
 
 
 port play : () -> Cmd msg
@@ -13,7 +18,10 @@ port pause : () -> Cmd msg
 port rewind : () -> Cmd msg
 
 
-port fastfoward : () -> Cmd msg
+port fastforward : () -> Cmd msg
+
+
+port jumpTo : ItemId -> Cmd msg
 
 
 port onStateChangeRaw : (D.Value -> msg) -> Sub msg
@@ -36,30 +44,44 @@ onStateChange tag =
         onStateChangeRaw
             (tag
                 << handleResult
-                << D.decodeValue
-                    (D.string
-                        |> D.andThen playbackStateDecoder
-                    )
+                << D.decodeValue playbackStateDecoder
             )
 
 
-playbackStateDecoder : String -> D.Decoder PlaybackState
-playbackStateDecoder str =
-    case str of
-        "Stopped" ->
-            D.succeed Stopped
+playbackStateDecoder : D.Decoder PlaybackState
+playbackStateDecoder =
+    (D.field "ctor" D.string)
+        |> D.andThen
+            (\tag ->
+                case tag of
+                    "Stopped" ->
+                        D.map Stopped
+                            (D.field "count" D.int)
 
-        "Paused" ->
-            D.map Paused itemStateDecoder
+                    "Paused" ->
+                        D.map3 Paused
+                            (D.field "count" D.int)
+                            (D.field "offset" timeDecoder)
+                            (D.field "timestamps" (D.list itemStateDecoder))
 
-        "Playing" ->
-            D.map Playing itemStateDecoder
+                    "Playing" ->
+                        D.map3 Playing
+                            (D.field "count" D.int)
+                            (D.field "offset" timeDecoder)
+                            (D.field "timestamps" (D.list itemStateDecoder))
 
-        _ ->
-            D.fail "not a value of PlaybackState"
+                    _ ->
+                        D.fail "not a value of PlaybackState"
+            )
 
 
-itemStateDecoder : D.Decoder ItemState
+itemStateDecoder : D.Decoder PlaybackItemState
 itemStateDecoder =
-    D.map ItemState
-        (D.field "active" D.int)
+    D.map3 PlaybackItemState
+        (D.field "itemId" D.int)
+        (D.field "start" timeDecoder)
+        (D.field "end" timeDecoder)
+
+
+timeDecoder =
+    D.map ((*) Time.second) D.float

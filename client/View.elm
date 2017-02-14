@@ -1,6 +1,15 @@
 module View exposing (..)
 
-import Model exposing (Model, ItemId, PlaybackState(..))
+import Model
+    exposing
+        ( Model
+        , ItemId
+        , PlaybackState(..)
+        , isLoaded
+        , isPaused
+        , isPlaying
+        , currentItemState
+        )
 import Message exposing (Msg(..))
 import Routing exposing (Route(..))
 import Api exposing (Item)
@@ -14,15 +23,16 @@ import RemoteData as RD
 view : Model -> Html Msg
 view s =
     div [] <|
-        [ text (toString s)
-        , br [] []
-        , playbackView s
+        [ playbackView s
         , case s.route of
             LoginPage ->
                 loginView
 
             ItemListPage ->
                 itemsView s
+        , br [] []
+        , br [] []
+        , text (toString s)
         ]
 
 
@@ -50,7 +60,7 @@ itemsView s =
             RD.Success items ->
                 div [] <|
                     List.map
-                        (\( _, item ) -> itemView s.recordingId item)
+                        (\( _, item ) -> itemView s item)
                         (Dict.toList items)
         , input
             [ value s.addItemInput
@@ -61,7 +71,7 @@ itemsView s =
         ]
 
 
-itemView mRecording wItem =
+itemView { playbackState, recordingId } wItem =
     case wItem of
         RD.NotAsked ->
             br [] []
@@ -74,10 +84,32 @@ itemView mRecording wItem =
 
         RD.Success item ->
             div [] <|
-                [ text (item.text)
+                [ let
+                    txt =
+                        a
+                            ([]
+                                ++ if
+                                    isPaused playbackState
+                                        || isPlaying playbackState
+                                   then
+                                    [ onClick (TextClicked item.idKey) ]
+                                   else
+                                    []
+                            )
+                            [ text (item.text) ]
+                  in
+                    if
+                        currentItemState playbackState
+                            |> Maybe.map ((==) item.idKey << .itemId)
+                            |> Maybe.withDefault False
+                    then
+                        mark []
+                            [ txt ]
+                    else
+                        txt
                 , text " - "
                 , button [ onClick (DeleteButton item.idKey) ] [ text "x" ]
-                , case mRecording of
+                , case recordingId of
                     Nothing ->
                         button [ onClick (RecordButton item.idKey) ]
                             [ text "start recording" ]
@@ -104,23 +136,44 @@ itemView mRecording wItem =
 
 
 playbackView s =
-    div []
-        [ button [ onClick PlayButton ]
-            [ text
-                (case s.playbackState of
-                    Stopped ->
-                        "Play"
-
-                    Paused _ ->
-                        "Resume"
-
-                    Playing _ ->
-                        "Pause"
+    let
+        disableWhenNotPlayingOrPaused =
+            disabled
+                (not
+                    (isPaused s.playbackState || isPlaying s.playbackState)
                 )
+    in
+        div []
+            [ button
+                [ onClick PlayButton
+                , disabled (not (isLoaded s.playbackState))
+                ]
+                [ text
+                    (case s.playbackState of
+                        NotLoaded ->
+                            "Play"
+
+                        Stopped _ ->
+                            "Play"
+
+                        Paused _ _ _ ->
+                            "Resume"
+
+                        Playing _ _ _ ->
+                            "Pause"
+                    )
+                ]
+            , button
+                [ onClick RewindButton
+                , disableWhenNotPlayingOrPaused
+                ]
+                [ text "<<" ]
+            , button
+                [ onClick FastForwardButton
+                , disableWhenNotPlayingOrPaused
+                ]
+                [ text ">>" ]
             ]
-        , button [ onClick RewindButton ] [ text "<<" ]
-        , button [ onClick FastForwardButton ] [ text ">>" ]
-        ]
 
 
 snd ( _, b ) =

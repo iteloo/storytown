@@ -14,7 +14,7 @@ main =
     Nav.program UrlChange
         { init = \loc -> init ! [] :> Update.urlChange loc
         , update = Update.update
-        , subscriptions = always Sub.none
+        , subscriptions = always subs
         , view = view
         }
 

@@ -2,9 +2,7 @@
 var _user$project$Native_MediaRecorder = function() {
 
   let media = {
-        tag: 'audio',
         type: 'audio/ogg',
-        ext: '.ogg',
         gUM: {audio: true}
       },
       stream,

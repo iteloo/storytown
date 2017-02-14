@@ -7,6 +7,8 @@ import MediaRecorder as MR
 import Navigation as Nav
 import RemoteData as RD
 import Http
+import List.Zipper exposing (Zipper)
+import Time
 
 
 type Msg
@@ -20,6 +22,7 @@ type Msg
     | AddItemInputChange String
     | AddItemButton
     | DeleteButton ItemId
+    | TextClicked ItemId
       -- ITEM LIST: SERVER
     | ItemIds (Web (List ItemId))
     | ItemInfo ItemId (Web Item)
@@ -41,6 +44,7 @@ type Msg
     | AudioStarted (Result () ())
     | Rewinded (Result () ())
     | PlaybackStateChanged PlaybackState
+    | NextSentence Int
       -- ROUTING
     | UrlChange Nav.Location
     | GotoRoute Route
