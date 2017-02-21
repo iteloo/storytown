@@ -12,7 +12,7 @@ main = do
     -- To specify configuration preferences, newEnv is used to create a new Env. The Region denotes the AWS region requests will be performed against,
     -- and Credentials is used to specify the desired mechanism for supplying or retrieving AuthN/AuthZ information.
     -- In this case, Discover will cause the library to try a number of options such as default environment variables, or an instance's IAM Profile:
-    e <- newEnv Oregon Discover
+    e <- newEnv Discover <&> set envRegion Oregon
 
     -- A new Logger to replace the default noop logger is created, with the logger set to print debug information and errors to stdout:
     l <- newLogger Debug stdout

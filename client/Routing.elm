@@ -1,11 +1,28 @@
-module Routing exposing (Route(..), parsePath, makePath)
+module Routing
+    exposing
+        ( Route(..)
+        , parsePath
+        , makePath
+        , StoryEditMode(..)
+        )
 
 import UrlParser as Url exposing (..)
 
 
+type alias StoryId =
+    -- [todo] refactor this duplicate declaration
+    Int
+
+
 type Route
     = LoginPage
-    | ItemListPage
+    | StoryPage StoryEditMode
+    | Dashboard
+
+
+type StoryEditMode
+    = New
+    | Existing StoryId
 
 
 parsePath =
@@ -15,8 +32,10 @@ parsePath =
 route : Url.Parser (Route -> a) a
 route =
     Url.oneOf
-        [ Url.map ItemListPage top
+        [ Url.map (StoryPage << Existing) (s "story" </> s "edit" </> int)
+        , Url.map (StoryPage New) (s "story" </> s "new")
         , Url.map LoginPage (s "login")
+        , Url.map Dashboard (s "dashboard")
         ]
 
 
@@ -25,5 +44,11 @@ makePath route =
         LoginPage ->
             "/#login"
 
-        ItemListPage ->
-            "/"
+        StoryPage New ->
+            "#/story/new"
+
+        StoryPage (Existing storyid) ->
+            "#/story/edit/" ++ toString storyid
+
+        Dashboard ->
+            "/#dashboard"

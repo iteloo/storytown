@@ -2,7 +2,11 @@ module Model
     exposing
         ( Model
         , init
+        , StoryId
         , ItemId
+        , AuthData
+        , UserGroup(..)
+        , StoryEdit
         , Web
         , PlaybackState(..)
         , PlaybackItemState
@@ -14,7 +18,7 @@ module Model
         )
 
 import Routing exposing (Route(..))
-import Api exposing (Item)
+import Api exposing (Story, Item)
 import Dict
 import RemoteData as RD
 import Time
@@ -26,9 +30,11 @@ type alias Model =
       usernameInput : String
     , passwordInput :
         String
+        -- DASHBOARD
+    , stories :
+        Web (List ( StoryId, Story ))
         -- ITEM LIST
-    , items : Web (Dict.Dict Int (Web Item))
-    , addItemInput : String
+    , story : Web StoryEdit
     , recordingId :
         Maybe ItemId
         -- PLAYBACK
@@ -38,7 +44,7 @@ type alias Model =
     , error :
         Maybe String
         -- CONTEXT
-    , jwt : Maybe String
+    , auth : Maybe AuthData
     , route : Route
     , history : List Route
     }
@@ -48,12 +54,12 @@ init : Model
 init =
     { usernameInput = ""
     , passwordInput = ""
-    , items = RD.NotAsked
-    , addItemInput = ""
+    , stories = RD.NotAsked
+    , story = RD.NotAsked
     , recordingId = Nothing
     , playbackState = NotLoaded
     , error = Nothing
-    , jwt =
+    , auth =
         Nothing
         -- bogus value; will call update
     , route = LoginPage
@@ -61,12 +67,40 @@ init =
     }
 
 
+type alias StoryId =
+    Int
+
+
 type alias ItemId =
     Int
 
 
+type alias AuthData =
+    { jwt : String
+    , group : UserGroup
+    }
+
+
+type UserGroup
+    = Teacher
+    | Student
+
+
 type alias Web a =
     RD.RemoteData () a
+
+
+type alias StoryEdit =
+    { title : String
+    , sentences : Dict.Dict Int ItemEdit
+    , freshIndex : Int
+    }
+
+
+type alias ItemEdit =
+    { text : String
+    , audioUrl : Maybe String
+    }
 
 
 type PlaybackState

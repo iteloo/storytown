@@ -5,6 +5,7 @@ import           Control.Monad.IO.Class               (liftIO)
 import           Control.Monad.Logger                 (runNoLoggingT,
                                                        runStdoutLoggingT)
 import qualified Data.ByteString.Char8                as BS
+import           Data.Semigroup                       ((<>))
 import           Database.Persist.Postgresql
 import           Network.Wai.Middleware.RequestLogger (logStdout, logStdoutDev)
 import           Options.Applicative
@@ -34,14 +35,14 @@ main = do
           setPort p
         $ setBeforeMainLoop
           (hPutStrLn stderr ("listening on port " ++ show p ++ "..."))
-        $ defaultSettings
+          defaultSettings
   runStdoutLoggingT
     $ withPostgresqlPool (pgConnStr pgconf) (pgPoolSize pgconf)
     $ \pool -> liftIO $ do
         let cfg = Config pool env
         runSettings settings . logger =<< startApp cfg
 
-data AppSettings = AppSettings {
+newtype AppSettings = AppSettings {
   port :: Int
 }
 

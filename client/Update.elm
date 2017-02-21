@@ -4,6 +4,8 @@ import Model
     exposing
         ( Model
         , init
+        , UserGroup(..)
+        , StoryEdit
         , PlaybackState(..)
         , duration
         , currentItemState
@@ -39,122 +41,115 @@ update message s =
 
         LoginButton ->
             s
-                ! [ Server.send s.jwt
-                        NewToken
+                ! [ Server.send s.auth
+                        AuthDataReceived
                         (Api.postLogin (Login s.usernameInput s.passwordInput))
                   ]
 
         -- LOGIN: SERVER
-        NewToken token ->
+        AuthDataReceived authUnsafe ->
             -- [problem] assumes token is always valid
-            { s | jwt = Just token }
-                ! []
-                :> gotoRoute ItemListPage
+            let
+                toSafe groupUnsafe =
+                    case groupUnsafe of
+                        "Teacher" ->
+                            Teacher
+
+                        "Student" ->
+                            Student
+
+                        str ->
+                            Debug.crash
+                                ("Cannot decode UserGroup value :" ++ str)
+            in
+                { s
+                    | auth =
+                        Just
+                            { jwt = authUnsafe.jwt
+                            , group = toSafe authUnsafe.user.group
+                            }
+                }
+                    ! []
+                    :> gotoRoute Dashboard
+
+        -- DASHBOARD
+        StoriesReceived stories ->
+            { s | stories = stories } ! []
 
         -- ITEM LIST: UI
-        AddItemInputChange t ->
-            { s | addItemInput = t } ! []
-
-        AddItemButton ->
-            let
-                new =
-                    s.addItemInput
-            in
-                if new == "" then
-                    -- [todo] add error for empty field
-                    s ! []
-                else
+        ApplyButton storyId ->
+            case s.story of
+                RD.Success draft ->
                     s
-                        ! [ Server.send s.jwt
-                                (ItemAdded new)
-                                (Api.postApiItem new)
+                        ! [ Server.send s.auth
+                                (always StoryCreatedOrUpdated)
+                                (Api.putApiStoryById storyId
+                                    (storyFromDraft draft)
+                                )
                           ]
 
-        DeleteButton idKey ->
-            s
-                ! [ Server.send s.jwt
-                        (ItemDeleted << always idKey)
-                        (Api.deleteApiItemByItemId idKey)
-                  ]
+                _ ->
+                    s ! []
+
+        CreateButton ->
+            case s.story of
+                RD.Success story ->
+                    s
+                        ! [ Server.send s.auth
+                                (always StoryCreatedOrUpdated)
+                                (Api.postApiStory (storyFromDraft story))
+                          ]
+
+                _ ->
+                    s ! []
+
+        AddBelowButton index ->
+            updateStory
+                (\sty ->
+                    { sty
+                        | sentences =
+                            Dict.insert sty.freshIndex
+                                (Item "" Nothing)
+                                sty.sentences
+                        , freshIndex = sty.freshIndex + 1
+                    }
+                )
+                s
+
+        DeleteButton index ->
+            updateSentences (Dict.remove index) s
 
         TextClicked itemId ->
             s ! [ Audio.jumpTo itemId ]
 
-        -- ITEM LIST: SERVER
-        ItemIds wItemIds ->
-            RD.update
-                (\ids ->
-                    (Dict.fromList <| List.map (\i -> ( i, RD.Loading )) ids)
-                        ! List.map
-                            (\idKey ->
-                                Server.sendW s.jwt
-                                    (ItemInfo idKey)
-                                    (Api.getApiItemByItemId idKey)
-                            )
-                            ids
+        ItemSourceChange index txt ->
+            updateSentences
+                (Dict.update index
+                    (Maybe.map (\item -> { item | text = txt }))
                 )
-                wItemIds
-                |> \( wItems, cmd ) -> { s | items = wItems } ! [ cmd ]
+                s
 
-        ItemInfo idKey wItem ->
-            let
-                wItems =
-                    RD.map (Dict.insert idKey wItem) s.items
-            in
-                { s | items = wItems }
-                    ! case
-                        RD.toMaybe wItems
-                            |> Maybe.andThen
-                                (\items ->
-                                    sequenceMaybe
-                                        (List.map RD.toMaybe
-                                            (Dict.values items)
-                                        )
-                                )
-                      of
-                        Nothing ->
-                            []
-
-                        Just items ->
-                            case
-                                sequenceMaybe
-                                    (List.map
-                                        (\i ->
-                                            (i.audioUrl
-                                                |> Maybe.andThen
-                                                    (\url ->
-                                                        Just
-                                                            ( url, i.idKey )
-                                                    )
-                                            )
-                                        )
-                                        items
-                                    )
-                            of
-                                Nothing ->
-                                    []
-
-                                Just iteminfo ->
-                                    [ Audio.load iteminfo ]
-
-        ItemAdded text itemId ->
+        -- ITEM LIST: SERVER
+        StoryReceived story ->
             { s
-                | addItemInput = ""
-                , items =
+                | story =
                     RD.map
-                        (Dict.insert itemId <|
-                            RD.succeed <|
-                                Item itemId text Nothing
+                        (\sty ->
+                            { title = sty.title
+                            , sentences =
+                                Dict.fromList <|
+                                    List.indexedMap (,) sty.sentences
+                            , freshIndex = List.length sty.sentences
+                            }
                         )
-                        s.items
+                        story
             }
                 ! []
 
-        ItemDeleted idKey ->
-            { s | items = RD.map (Dict.remove idKey) s.items } ! []
-
-        ItemUpdated _ ->
-            s ! []
+        StoryCreatedOrUpdated ->
+            { s | story = RD.NotAsked }
+                ! []
+                :> gotoRoute Dashboard
 
         -- ITEM LIST: AUDIO: UI
         RecordButton itemid ->
@@ -172,27 +167,18 @@ update message s =
                     Debug.crash "This branch should not exist"
 
                 Just itemid ->
-                    { s
-                        | recordingId = Nothing
-                        , items =
-                            RD.map
-                                (Dict.update
-                                    itemid
-                                    (Maybe.map
-                                        (RD.map
-                                            (\item ->
-                                                { item | audioUrl = Just url }
-                                            )
-                                        )
-                                    )
-                                )
-                                s.items
-                    }
+                    { s | recordingId = Nothing }
                         ! [ Server.send
-                                s.jwt
+                                s.auth
                                 (S3SignedRequestAudio itemid blob)
                                 (Api.getApiS3ByDir "audio")
                           ]
+                        :> updateSentences
+                            (Dict.update itemid
+                                (Maybe.map
+                                    (\item -> { item | audioUrl = Just url })
+                                )
+                            )
 
         -- ITEM LIST: AUDIO: SERVER
         S3SignedRequestAudio itemid blob reqUrl ->
@@ -209,31 +195,19 @@ update message s =
 
         -- ITEM LIST: AUDIO: S3
         S3UploadDone baseUrl itemid ->
-            let
-                ( wItems, cmd ) =
-                    s.items |> RD.update updateItems
-
-                updateItems items =
-                    case Dict.get itemid items of
+            updateSentences
+                (\ss ->
+                    case Dict.get itemid ss of
                         Nothing ->
                             Debug.crash
                                 ("missing item with id: " ++ toString itemid)
 
-                        Just wItem ->
-                            wItem |> RD.update (updateItem items)
-
-                updateItem items item =
-                    let
-                        newItem =
-                            { item | audioUrl = Just baseUrl }
-                    in
-                        Dict.insert itemid (RD.succeed newItem) items
-                            ! [ Server.send s.jwt
-                                    ItemUpdated
-                                    (Api.putApiItem newItem)
-                              ]
-            in
-                { s | items = wItems |> RD.andThen identity } ! [ cmd ]
+                        Just item ->
+                            Dict.insert itemid
+                                { item | audioUrl = Just baseUrl }
+                                ss
+                )
+                s
 
         -- PLAYBACK
         PlayButton ->
@@ -284,11 +258,7 @@ update message s =
                     if cnt == old_cnt then
                         case
                             -- next item
-                            List.head
-                                (List.filter
-                                    (\i -> i.start > old_ct)
-                                    ts
-                                )
+                            List.head (List.filter (\i -> i.start > old_ct) ts)
                         of
                             Nothing ->
                                 s ! Debug.log "no item found" []
@@ -305,9 +275,6 @@ update message s =
         -- ROUTING
         UrlChange loc ->
             urlChange loc s
-
-        GotoRoute route ->
-            gotoRoute route s
 
         -- ERROR
         Error msg ->
@@ -340,14 +307,24 @@ stopRecording s =
                 (\r ->
                     case r of
                         Err e ->
-                            Debug.crash
-                                "audio file failed to be prepared"
+                            Debug.crash "audio file failed to be prepared"
 
                         Ok r ->
                             FileReady r
                 )
                 (MR.stop ())
           ]
+
+
+
+-- STORY EDIT
+
+
+storyFromDraft : StoryEdit -> Api.Story
+storyFromDraft draft =
+    { title = draft.title
+    , sentences = Dict.values draft.sentences
+    }
 
 
 
@@ -360,20 +337,52 @@ urlChange loc s =
             error "Cannot parse path" s
 
         Just route ->
+            maybeReroute route s
+
+
+maybeReroute route s =
+    let
+        finishWithoutReroute route s =
             { s | route = route, history = s.route :: s.history }
                 ! []
                 :> setupRoute route
+    in
+        case route of
+            LoginPage ->
+                finishWithoutReroute LoginPage s
+
+            _ ->
+                case s.auth of
+                    Nothing ->
+                        gotoRoute LoginPage s
+
+                    Just auth ->
+                        finishWithoutReroute route s
 
 
 gotoRoute route s =
-    s ! [ Nav.newUrl <| makePath route ]
+    s ! [ Nav.newUrl (makePath route) ]
 
 
 setupRoute route s =
     case route of
-        ItemListPage ->
-            { s | items = RD.Loading }
-                ! [ Server.sendW s.jwt ItemIds Api.getApiItem ]
+        StoryPage (Routing.New) ->
+            { s
+                | story =
+                    RD.succeed
+                        { title = "Untitled"
+                        , freshIndex = 0
+                        , sentences = Dict.empty
+                        }
+            }
+                ! []
+
+        StoryPage (Routing.Existing storyid) ->
+            { s | story = RD.Loading }
+                ! [ Server.sendW s.auth
+                        StoryReceived
+                        (Api.getApiStoryById storyid)
+                  ]
 
         LoginPage ->
             { s
@@ -381,6 +390,13 @@ setupRoute route s =
                 , passwordInput = ""
             }
                 ! []
+
+        Dashboard ->
+            s
+                ! [ Server.sendW s.auth
+                        StoriesReceived
+                        Api.getApiStory
+                  ]
 
 
 
@@ -395,6 +411,14 @@ error msg s =
 -- HELPERS
 
 
+updateStory f s =
+    { s | story = RD.map f s.story } ! []
+
+
+updateSentences f s =
+    s ! [] :> updateStory (\sty -> { sty | sentences = f sty.sentences })
+
+
 delay : Time.Time -> msg -> Cmd msg
 delay time msg =
     Process.sleep time
@@ -404,8 +428,7 @@ delay time msg =
 
 sequenceMaybe : List (Maybe a) -> Maybe (List a)
 sequenceMaybe =
-    List.foldr
-        (\m -> Maybe.andThen (\l -> Maybe.map (flip (::) l) m))
+    List.foldr (\m -> Maybe.andThen (\l -> Maybe.map (flip (::) l) m))
         (Just [])
 
 

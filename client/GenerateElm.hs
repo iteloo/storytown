@@ -19,6 +19,7 @@ import           Servant.Auth.Server
 import           Servant.Auth.Server.SetCookieOrphan ()
 import           Servant.Elm                         (ElmOptions (..), ElmType,
                                                       Proxy (Proxy),
+                                                      UrlPrefix (..),
                                                       defElmImports,
                                                       defElmOptions,
                                                       generateElmForAPIWith)
@@ -35,15 +36,20 @@ spec opt =
             (defElmImports
              :  toElmTypeSource    (Proxy :: Proxy NoContent)
              :  toElmSource        (Proxy :: Proxy Login)
+             ++ toElmSource        (Proxy :: Proxy User)
+             ++ toElmSource        (Proxy :: Proxy AuthData)
+             ++ toElmSource        (Proxy :: Proxy Story)
              ++ toElmSource        (Proxy :: Proxy Item)
              ++ generateElmForAPIWith opt (Proxy :: Proxy (SubAPI auths)))
 
 main :: IO ()
 main = do
   env <- readEnvWithDefault Development environmentEnvVar
+  let localOptions = defElmOptions
+        { urlPrefix = Servant.Elm.Static "http://localhost:5000" }
   let opt = case env of
-          Development -> defElmOptions { urlPrefix = "http://localhost:5000" }
-          Test        -> defElmOptions { urlPrefix = "http://localhost:5000" }
+          Development -> localOptions
+          Test        -> localOptions
           Production  -> defElmOptions
   specsToDir [spec opt] "client"
 

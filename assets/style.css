@@ -1,0 +1,46 @@
+.table {
+  display: table;
+  border-collapse: collapse;
+  height: 13pt;
+}
+
+.row {
+  display: table-row;
+  width: 1px;
+}
+
+.cell {
+  display: table-cell;
+  line-height: 1;
+  text-align: left;
+  vertical-align: top;
+}
+
+.cell .orig {
+  padding: .08em;
+  font-size: 36pt;
+  white-space: nowrap;
+}
+
+.padding {
+  display: table-cell;
+  text-align: center;
+  padding-left: 2pt;
+  padding-right: 2pt;
+  padding-bottom: 5pt;
+  width: 1px;
+}
+
+.trans {
+  border-top: 5px solid rgba(0, 127, 0, 0.4);
+  /* box-shadow: 0 7px rgba(0,127,0,0.4) inset; */
+  color: rgba(0, 127, 0, .7);
+}
+
+textarea {
+  font-family: monaco, Consolas, "Lucida Console", monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  height: 100%;
+  resize: none;
+}

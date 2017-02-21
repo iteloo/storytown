@@ -1,28 +1,23 @@
-resolver: lts-7.14
+resolver: lts-8.5
 
 packages:
 - .
 - location:
-    git: https://www.github.com/soenkehahn/wai-make-assets
-    commit: c72a924
-  extra-dep: true
-- location:
     git: https://www.github.com/iteloo/servant-elm
-    commit: 70d6299f6c4f7b12ab4fd0b307ae860cd35c18eb
+    commit: 7d77deb
   extra-dep: True
 - location:
     git: https://www.github.com/iteloo/amazonka
-    commit: 907e4d8
+    commit: 22440edf20d697595a461547ed72d244ba70ef28
   subdirs:
-  - core
+  - amazonka-s3
   extra-dep: True
+
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
-- elm-export-0.5.0.2
-- time-1.5.0.1
 - heroku-persistent-0.2.0
+- servant-auth-0.2.6.1
+- servant-auth-server-0.2.6.1
+- wai-make-assets-0.2
 - heroku-0.1.2.3
-- servant-auth-0.2.1.0
-- servant-auth-server-0.2.1.0
-- jose-0.5.0.2

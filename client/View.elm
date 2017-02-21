@@ -4,6 +4,8 @@ import Model
     exposing
         ( Model
         , ItemId
+        , StoryId
+        , UserGroup(..)
         , PlaybackState(..)
         , isLoaded
         , isPaused
@@ -13,26 +15,39 @@ import Model
 import Message exposing (Msg(..))
 import Routing exposing (Route(..))
 import Api exposing (Item)
+import Parser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Dict
 import RemoteData as RD
+import List.Nonempty as NList
+import Json.Encode exposing (string)
 
 
 view : Model -> Html Msg
 view s =
-    div [] <|
-        [ playbackView s
-        , case s.route of
-            LoginPage ->
-                loginView
+    div []
+        [ Html.node "link"
+            [ property "rel" (string "stylesheet")
+            , property "type" (string "text/css")
+            , property "href" (string "style.css")
+            ]
+            []
+        , div [] <|
+            [ case s.route of
+                LoginPage ->
+                    loginView
 
-            ItemListPage ->
-                itemsView s
-        , br [] []
-        , br [] []
-        , text (toString s)
+                StoryPage mode ->
+                    itemsView mode s
+
+                Dashboard ->
+                    dashboardView s
+            , br [] []
+            , br [] []
+            , text (toString s)
+            ]
         ]
 
 
@@ -45,9 +60,62 @@ loginView =
         ]
 
 
-itemsView s =
+
+-- DASHBOARD
+
+
+dashboardView s =
+    case s.auth of
+        Nothing ->
+            br [] []
+
+        Just auth ->
+            case auth.group of
+                Teacher ->
+                    teacherDashboard s
+
+                Student ->
+                    text "student dashboard"
+
+
+teacherDashboard s =
     div []
-        [ case s.items of
+        [ text "Teacher Dashboard"
+        , br [] []
+        , a
+            [ href (Routing.makePath (StoryPage Routing.New)) ]
+            [ text "New Story" ]
+        , case s.stories of
+            RD.NotAsked ->
+                br [] []
+
+            RD.Loading ->
+                text "Loading stories"
+
+            RD.Failure _ ->
+                text "Cannot load..."
+
+            RD.Success stories ->
+                ul [] <| List.map storyItemView stories
+        ]
+
+
+storyItemView ( storyId, story ) =
+    li []
+        [ a
+            [ href (Routing.makePath (StoryPage (Routing.Existing storyId))) ]
+            [ text story.title ]
+        ]
+
+
+
+-- ITEM VIEW
+
+
+itemsView mode s =
+    div []
+        [ playbackView s
+        , case s.story of
             RD.NotAsked ->
                 br [] []
 
@@ -57,71 +125,43 @@ itemsView s =
             RD.Failure e ->
                 text "Cannot load..."
 
-            RD.Success items ->
-                div [] <|
-                    List.map
-                        (\( _, item ) -> itemView s item)
-                        (Dict.toList items)
-        , input
-            [ value s.addItemInput
-            , onInput AddItemInputChange
-            ]
-            []
-        , button [ onClick AddItemButton ] [ text "add item" ]
+            RD.Success story ->
+                div [ class "table" ] <|
+                    Dict.values <|
+                        Dict.map
+                            (\index item -> itemView s index item)
+                            story.sentences
+        , button [ onClick (AddBelowButton 0) ] [ text "+" ]
+        , case mode of
+            Routing.New ->
+                button [ onClick CreateButton ] [ text "Create" ]
+
+            Routing.Existing storyId ->
+                button [ onClick (ApplyButton storyId) ] [ text "Apply" ]
         ]
 
 
-itemView { playbackState, recordingId } wItem =
-    case wItem of
-        RD.NotAsked ->
-            br [] []
+itemView { playbackState, recordingId } index item =
+    div [ class "row" ]
+        [ div [ class "cell" ]
+            [ button [ onClick (DeleteButton index) ] [ text "x" ] ]
+        , div [ class "cell" ]
+            [ div [ class "table" ]
+                [ div [ class "cell" ]
+                    [ case recordingId of
+                        Nothing ->
+                            button [ onClick (RecordButton index) ]
+                                [ text "record" ]
 
-        RD.Loading ->
-            text "Loading..."
-
-        RD.Failure e ->
-            text "Cannot load..."
-
-        RD.Success item ->
-            div [] <|
-                [ let
-                    txt =
-                        a
-                            ([]
-                                ++ if
-                                    isPaused playbackState
-                                        || isPlaying playbackState
-                                   then
-                                    [ onClick (TextClicked item.idKey) ]
-                                   else
-                                    []
-                            )
-                            [ text (item.text) ]
-                  in
-                    if
-                        currentItemState playbackState
-                            |> Maybe.map ((==) item.idKey << .itemId)
-                            |> Maybe.withDefault False
-                    then
-                        mark []
-                            [ txt ]
-                    else
-                        txt
-                , text " - "
-                , button [ onClick (DeleteButton item.idKey) ] [ text "x" ]
-                , case recordingId of
-                    Nothing ->
-                        button [ onClick (RecordButton item.idKey) ]
-                            [ text "start recording" ]
-
-                    Just recId ->
-                        if recId == item.idKey then
-                            button [ onClick (RecordButton item.idKey) ]
-                                [ text "stop recording" ]
-                        else
-                            button [ disabled True ]
-                                [ text "start recording" ]
-                , (case item.audioUrl of
+                        Just recId ->
+                            if recId == index then
+                                button [ onClick (RecordButton index) ]
+                                    [ text "stop rec" ]
+                            else
+                                button [ disabled True ]
+                                    [ text "record" ]
+                    ]
+                , case item.audioUrl of
                     Nothing ->
                         text "No audio"
 
@@ -131,25 +171,95 @@ itemView { playbackState, recordingId } wItem =
                             , src url
                             ]
                             []
-                  )
+                ]
+            , div [ class "table" ]
+                [ div [ class "cell" ]
+                    [ let
+                        txt =
+                            a
+                                ([]
+                                    ++ if
+                                        isPaused playbackState
+                                            || isPlaying playbackState
+                                       then
+                                        [ onClick (TextClicked index) ]
+                                       else
+                                        []
+                                )
+                                [ textarea
+                                    [ placeholder "Write something..."
+                                    , onInput (ItemSourceChange index)
+                                    ]
+                                    [ text item.text ]
+                                ]
+                      in
+                        if
+                            currentItemState playbackState
+                                |> Maybe.map ((==) index << .itemId)
+                                |> Maybe.withDefault False
+                        then
+                            mark []
+                                [ txt ]
+                        else
+                            txt
+                    ]
+                , case Parser.parseTranslatedText item.text of
+                    Ok r ->
+                        transView r
+
+                    Err e ->
+                        text e
+                ]
+            ]
+        ]
+
+
+transView trans =
+    div [ class "table" ]
+        [ div [] <|
+            List.map transBlockView trans
+        ]
+
+
+transBlockView : Parser.TranslatedBlock -> Html Msg
+transBlockView block =
+    case block of
+        Parser.L2Word w ->
+            div [ class "cell orig" ] [ text w ]
+
+        Parser.TranslatedBlock bs trans ->
+            div [ class "cell" ]
+                [ div [ class "row" ]
+                    [ div [] <|
+                        NList.toList <|
+                            NList.map transBlockView bs
+                    ]
+                , div [ class "padding" ]
+                    [ div [ class "trans" ]
+                        [ text trans ]
+                    ]
                 ]
 
 
-playbackView s =
+
+-- PLAYBACK
+
+
+playbackView { playbackState } =
     let
         disableWhenNotPlayingOrPaused =
             disabled
                 (not
-                    (isPaused s.playbackState || isPlaying s.playbackState)
+                    (isPaused playbackState || isPlaying playbackState)
                 )
     in
         div []
             [ button
                 [ onClick PlayButton
-                , disabled (not (isLoaded s.playbackState))
+                , disabled (not (isLoaded playbackState))
                 ]
                 [ text
-                    (case s.playbackState of
+                    (case playbackState of
                         NotLoaded ->
                             "Play"
 

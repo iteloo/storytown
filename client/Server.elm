@@ -1,48 +1,48 @@
 module Server exposing (send, sendW)
 
 import Message exposing (Msg(..))
-import Model exposing (Web)
+import Model exposing (..)
 import Http
 import HttpBuilder as HttpB
 import RemoteData as RD
 
 
 send :
-    Maybe String
+    Maybe AuthData
     -> (a -> Msg)
     -> HttpB.RequestBuilder a
     -> Cmd Msg
-send jwt tag =
+send auth tag =
     Http.send (handleHttpError tag Nothing)
-        << reqWithAuth jwt
+        << reqWithAuth auth
 
 
 sendW :
-    Maybe String
+    Maybe AuthData
     -> (Web a -> Msg)
     -> HttpB.RequestBuilder a
     -> Cmd Msg
-sendW jwt tag =
+sendW auth tag =
     Http.send
         (handleHttpError
             (tag << RD.succeed)
             (Just (tag << RD.Failure << always ()))
         )
-        << reqWithAuth jwt
+        << reqWithAuth auth
 
 
 reqWithAuth :
-    Maybe String
+    Maybe AuthData
     -> HttpB.RequestBuilder a
     -> Http.Request a
-reqWithAuth jwt =
+reqWithAuth auth =
     HttpB.toRequest
-        << case jwt of
+        << case auth of
             Nothing ->
                 identity
 
-            Just jwt ->
-                HttpB.withHeader "Authorization" ("Bearer " ++ jwt)
+            Just auth ->
+                HttpB.withHeader "Authorization" ("Bearer " ++ auth.jwt)
 
 
 handleHttpError :

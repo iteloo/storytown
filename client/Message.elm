@@ -1,7 +1,7 @@
 module Message exposing (Msg(..))
 
-import Model exposing (Web, ItemId, PlaybackState)
-import Api exposing (Item)
+import Model exposing (..)
+import Api exposing (Item, Story)
 import Routing exposing (Route)
 import MediaRecorder as MR
 import Navigation as Nav
@@ -17,18 +17,19 @@ type Msg
     | PasswordInputChange String
     | LoginButton
       -- LOGIN: SERVER
-    | NewToken String
+    | AuthDataReceived Api.AuthData
+      -- DASHBOARD
+    | StoriesReceived (Web (List ( StoryId, Story )))
       -- ITEM LIST: UI
-    | AddItemInputChange String
-    | AddItemButton
+    | AddBelowButton Int
+    | ApplyButton StoryId
+    | CreateButton
     | DeleteButton ItemId
     | TextClicked ItemId
+    | ItemSourceChange Int String
       -- ITEM LIST: SERVER
-    | ItemIds (Web (List ItemId))
-    | ItemInfo ItemId (Web Item)
-    | ItemAdded String ItemId
-    | ItemDeleted ItemId
-    | ItemUpdated ItemId
+    | StoryReceived (Web Story)
+    | StoryCreatedOrUpdated
       -- ITEM LIST: AUDIO: UI
     | RecordButton ItemId
       -- ITEM LIST: AUDIO: NATIVE
@@ -47,7 +48,6 @@ type Msg
     | NextSentence Int
       -- ROUTING
     | UrlChange Nav.Location
-    | GotoRoute Route
       -- ERROR
     | Error String
     | UnauthorizedError

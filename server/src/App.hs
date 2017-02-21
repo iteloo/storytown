@@ -17,9 +17,11 @@ import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource        (ResourceT)
 import qualified Data.ByteString.Char8               as BS
 import qualified Data.ByteString.Lazy.Char8          as LBS
+import           Data.Text                           (Text)
 import qualified Data.Text                           as Text
 import qualified Data.Time                           as Time
 import qualified Data.Time.Clock.POSIX               as Time
+import           Database.Persist                    ((==.))
 import qualified Database.Persist                    as DB
 import qualified Database.Persist.Postgresql         as DB
 import           Network.AWS.S3
@@ -42,10 +44,7 @@ data Config = Config {
 
 startApp :: Config -> IO Application
 startApp cfg = do
-  -- We *also* need a key to sign the cookies
   myKey <- generateKey
-  -- Adding some configurations. 'Cookie' requires, in addition to
-  -- CookieSettings, JWTSettings (for signing), so everything is just as before
   let jwtCfg = defaultJWTSettings myKey
       ctx = defaultCookieSettings :. jwtCfg :. EmptyContext
       api = Proxy :: Proxy (API '[JWT])
@@ -55,7 +54,7 @@ startApp cfg = do
           Cors.corsRequestHeaders = Cors.simpleHeaders ++ [ hAuthorization ]
         , Cors.corsMethods = Cors.simpleMethods ++ [ "DELETE" ]
         }
-  e <- newEnv Oregon Discover
+  e <- newEnv Discover <&> set envRegion Oregon
   l <- newLogger Debug stdout
   return
     $ Cors.cors (const $ Just corsPolicy)
@@ -81,22 +80,32 @@ server cs jwts =
 
 protected :: AuthResult User -> MyServer Protected
 protected (Authenticated user) =
-       return (name user)
+       return (firstName user)
   :<|> return (email user)
-  :<|> itemServer
+  -- :<|> itemServer
+  :<|> storyServer
   :<|> getSignedPutObjectRequest
 protected _ = throwAll err401
 
 unprotected :: CookieSettings -> JWTSettings -> MyServer Unprotected
 unprotected = checkCreds
 
-checkCreds :: CookieSettings -> JWTSettings -> Login -> MyHandler String
+checkCreds :: CookieSettings -> JWTSettings -> Login -> MyHandler AuthData
 checkCreds cookieSettings jwtSettings (Login "" "") = do
-   let usr = User "Ali Baba" "ali@email.com"
+   let usr = User {
+     userId = 0
+   , firstName = "Ali"
+   , lastName = "Baba"
+   , email = "ali@email.com"
+   , group = "Teacher"
+   }
    etoken <- liftIO $ makeJWT usr jwtSettings Nothing
    case etoken of
      Left e     -> throwError err401
-     Right token -> return $ LBS.unpack token
+     Right token -> return AuthData {
+        jwt = LBS.unpack token
+      , user = usr
+    }
 checkCreds _ _ _ = throwError err401
 
 
@@ -112,44 +121,82 @@ getSignedPutObjectRequest dir = do
   let req = putObject "storytown-bucket" objectkey b
   -- [todo] allow client to pass in content-type
               & poContentType .~ Just "audio/ogg"
-  lift $ fmap BS.unpack $ presignURL ts 1200 req
+  lift (BS.unpack <$> presignURL ts 1200 req)
 
 
--- ITEM HANDLERS
-
-itemServer :: MyServer ItemApi
-itemServer =
-       listItems
-  :<|> getItem
-  :<|> postItem
-  :<|> putItem
-  :<|> deleteItem
+-- DB HANDLER
 
 runDb query = asks pool >>= liftIO . DB.runSqlPool query
 
-listItems :: MyHandler [ItemId]
-listItems = fmap (map DB.fromSqlKey)
-    (runDb $ DB.selectKeysList [] [] :: MyHandler [Key DItem])
 
-getItem :: ItemId -> MyHandler Item
-getItem newId = fmap (dItemToItem newId) $ runDb $ do
-      item <- DB.get $ DB.toSqlKey newId
-      maybe (fail "cannot get") return item
+-- STORY HANDLERS
 
-postItem :: String -> MyHandler ItemId
-postItem new = fmap DB.fromSqlKey $ runDb
-    $ DB.insert (DItem new Nothing)
+storyServer :: MyServer StoryApi
+storyServer =
+       getStories
+  :<|> postStory
+  :<|> getStory
+  :<|> putStory
+  :<|> deleteStory
 
-putItem :: Item -> MyHandler ItemId
-putItem item = runDb $ do
-    -- [problem] will insert if new id
-      DB.repsert (DB.toSqlKey (idKey item)) (itemToDItem item)
-      return $ idKey item
+getStories :: MyHandler [(StoryId, Story)]
+getStories = do
+    ids <- runDb $ DB.selectKeysList [] [] :: MyHandler [Key DStory]
+    sequence [ do
+        story <- getStory storyId
+        return (storyId, story)
+      | storyId <- DB.fromSqlKey <$> ids ]
 
-deleteItem :: ItemId -> MyHandler NoContent
-deleteItem itemid = fmap (\() -> NoContent) $ runDb
-    $ DB.delete (DB.toSqlKey itemid :: Key DItem)
+postStory :: Story -> MyHandler StoryId
+postStory story = runDb $ do
+    storyId <- DB.fromSqlKey <$> DB.insert DStory {
+        dStoryTitle = title story
+      }
+    insertSentencesForStory storyId story
+    return storyId
 
-itemToDItem (Item id txt url) = DItem txt url
+getStory :: StoryId -> MyHandler Story
+getStory newId = runDb $ do
+      let storyId = DB.toSqlKey newId
+      mstory <- DB.get storyId
+      case mstory of
+        Nothing -> fail "cannot get story"
+        Just story -> do
+          -- get all sentences
+          sentences <- DB.selectList [DItemStoryId ==. storyId] []
+          return Story {
+              title = dStoryTitle story
+            , sentences = [ Item {
+                text = dItemText (DB.entityVal s)
+              , audioUrl = dItemAudioUrl (DB.entityVal s)
+              } | s <- sentences ]
+            }
 
-dItemToItem id (DItem txt url) = Item id txt url
+putStory :: StoryId -> Story -> MyHandler NoContent
+putStory storyId story = runDb $ do
+    DB.repsert (DB.toSqlKey storyId) DStory {
+        dStoryTitle = title story
+      }
+    -- remove sentences under this storyid
+    deleteAllSentences storyId
+    -- insert new sentences
+    insertSentencesForStory storyId story
+    return NoContent
+
+deleteStory :: StoryId -> MyHandler NoContent
+deleteStory storyid = runDb $ do
+    DB.delete (DB.toSqlKey storyid :: Key DStory)
+    deleteAllSentences storyid
+    return NoContent
+
+insertSentencesForStory storyId story =
+    sequence_ [
+      DB.insert_ DItem {
+          dItemStoryId = DB.toSqlKey storyId
+        , dItemText = text s
+        , dItemAudioUrl = audioUrl s
+        }
+      | s <- sentences story ]
+
+deleteAllSentences storyid =
+    DB.deleteWhere [DItemStoryId ==. DB.toSqlKey storyid]

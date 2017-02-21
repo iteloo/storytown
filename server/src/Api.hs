@@ -15,6 +15,8 @@ module Api where
 import           Data.Aeson
 import           Data.Int            (Int64)
 import           Data.Proxy
+import           Data.Text           (Text)
+import qualified Data.Text           as Text
 import           Database.Persist
 import           Database.Persist.TH
 import           GHC.Generics
@@ -25,40 +27,86 @@ import           Servant.Elm
 -- DATA MODELS
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
+DUser
+    firstName Text
+    lastName Text
+    email String
+    password String
+    group String
+    deriving Show
+DStory
+    title Text
+    deriving Show
 DItem
-    text String
+    storyId DStoryId
+    text Text
     audioUrl String Maybe
     deriving Show
 |]
 
+type UserId = Int64
+type StoryId = Int64
 type ItemId = Int64
 
-data Item
-  = Item {
-    idKey    :: ItemId,
-    text     :: String,
+data Item = Item {
+    text     :: Text,
     audioUrl :: Maybe String
-  }
-  deriving (Show, Eq, Generic)
+} deriving (Show, Eq, Generic)
 
 instance ToJSON Item
 instance FromJSON Item
 instance ElmType Item
 
-data User = User { name :: String, email :: String }
-   deriving (Eq, Show, Read, Generic)
+data User = User {
+    userId    :: UserId
+  , firstName :: Text
+  , lastName  :: Text
+  , email     :: String
+  , group     :: UserGroupUnsafe
+} deriving (Eq, Show, Read, Generic)
 
 instance ToJSON User
 instance ToJWT User
 instance FromJSON User
 instance FromJWT User
+instance ElmType User
 
-data Login = Login { username :: String, password :: String }
-   deriving (Eq, Show, Read, Generic)
+data Story = Story {
+    title     :: Text
+  , sentences :: [Item]
+} deriving (Eq, Show, Generic)
+
+instance ToJSON Story
+instance FromJSON Story
+instance ElmType Story
+
+data Login = Login {
+    username :: String
+  , password :: String
+} deriving (Eq, Show, Read, Generic)
 
 instance ToJSON Login
 instance FromJSON Login
 instance ElmType Login
+
+data AuthData = AuthData {
+    jwt  :: String
+  , user :: User
+} deriving (Eq, Show, Read, Generic)
+
+instance ToJSON AuthData
+instance FromJSON AuthData
+instance ElmType AuthData
+
+type UserGroupUnsafe = String
+
+data UserGroup =
+    Teacher
+  | Student
+  deriving (Eq, Show, Read, Generic)
+
+userGroupToUnsafe :: UserGroup -> UserGroupUnsafe
+userGroupToUnsafe = show
 
 -- API
 
@@ -71,9 +119,9 @@ type SubAPI auths =
   :<|> Unprotected
 
 type Protected =
-       "name" :> Get '[JSON] String
+       "name" :> Get '[JSON] Text
   :<|> "email" :> Get '[JSON] String
-  :<|> "item" :> ItemApi
+  :<|> "story" :> StoryApi
   :<|> "s3" :> S3Api
 
 type S3Api =
@@ -82,11 +130,11 @@ type S3Api =
 type Unprotected =
   "login"
     :> ReqBody '[JSON] Login
-    :> Post '[JSON] String
+    :> Post '[JSON] AuthData
 
-type ItemApi =
-       Get '[JSON] [ItemId]
-  :<|> Capture "itemId" ItemId :> Get '[JSON] Item
-  :<|> ReqBody '[JSON] String :> Post '[JSON] ItemId
-  :<|> ReqBody '[JSON] Item :> Put '[JSON] ItemId
-  :<|> Capture "itemId" ItemId :> Delete '[JSON] NoContent
+type StoryApi =
+       Get '[JSON] [(StoryId, Story)]
+  :<|> ReqBody '[JSON] Story :> Post '[JSON] StoryId
+  :<|> Capture "id" StoryId :> Get '[JSON] Story
+  :<|> Capture "id" StoryId :> ReqBody '[JSON] Story :> Put '[JSON] NoContent
+  :<|> Capture "id" StoryId :> Delete '[JSON] NoContent

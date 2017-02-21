@@ -24,8 +24,8 @@ dependencies:
   - bytestring
   - wai-cors
   - http-types
-  - amazonka == 1.4.3
-  - amazonka-s3 == 1.4.3
+  - amazonka
+  - amazonka-s3
   - lens
   - time
   - resourcet
