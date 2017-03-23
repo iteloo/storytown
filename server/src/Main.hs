@@ -7,6 +7,7 @@ import           Control.Monad.Logger                 (runNoLoggingT,
 import qualified Data.ByteString.Char8                as BS
 import           Data.Semigroup                       ((<>))
 import           Database.Persist.Postgresql
+import qualified Network.Wai.Handler.WarpTLS          as TLS
 import           Network.Wai.Middleware.RequestLogger (logStdout, logStdoutDev)
 import           Options.Applicative
 import           Web.Heroku.Persist.Postgresql        (fromDatabaseUrl)
@@ -36,11 +37,12 @@ main = do
         $ setBeforeMainLoop
           (hPutStrLn stderr ("listening on port " ++ show p ++ "..."))
           defaultSettings
+  let tls = TLS.tlsSettings "ssl/certificate.pem" "ssl/key.pem"
   runStdoutLoggingT
     $ withPostgresqlPool (pgConnStr pgconf) (pgPoolSize pgconf)
     $ \pool -> liftIO $ do
         let cfg = Config pool env
-        runSettings settings . logger =<< startApp cfg
+        TLS.runTLS tls settings . logger =<< startApp cfg
 
 newtype AppSettings = AppSettings {
   port :: Int

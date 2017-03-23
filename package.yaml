@@ -30,6 +30,10 @@ dependencies:
   - time
   - resourcet
   - text
+  - warp-tls
+  - entropy
+  - base64-bytestring
+  - cookie
 
 executables:
   server:

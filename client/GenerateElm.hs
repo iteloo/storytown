@@ -46,7 +46,7 @@ main :: IO ()
 main = do
   env <- readEnvWithDefault Development environmentEnvVar
   let localOptions = defElmOptions
-        { urlPrefix = Servant.Elm.Static "http://localhost:5000" }
+        { urlPrefix = Servant.Elm.Static "https://127.0.0.1:5000" }
   let opt = case env of
           Development -> localOptions
           Test        -> localOptions
@@ -65,3 +65,6 @@ instance (HasForeign lang ftype sublayout)
   type Foreign ftype (Auth auths a :> sublayout) = Foreign ftype sublayout
   foreignFor lang ftype Proxy =
     foreignFor lang ftype (Proxy :: Proxy sublayout)
+
+instance ElmType a => ElmType (Headers hdrs a) where
+  toElmType _ = toElmType (undefined :: a)

@@ -76,8 +76,7 @@ type alias ItemId =
 
 
 type alias AuthData =
-    { jwt : String
-    , group : UserGroup
+    { group : UserGroup
     }
 
 

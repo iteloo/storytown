@@ -90,8 +90,7 @@ instance FromJSON Login
 instance ElmType Login
 
 data AuthData = AuthData {
-    jwt  :: String
-  , user :: User
+    user :: User
 } deriving (Eq, Show, Read, Generic)
 
 instance ToJSON AuthData
@@ -130,7 +129,7 @@ type S3Api =
 type Unprotected =
   "login"
     :> ReqBody '[JSON] Login
-    :> Post '[JSON] AuthData
+    :> Post '[JSON] (Headers '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] AuthData)
 
 type StoryApi =
        Get '[JSON] [(StoryId, Story)]

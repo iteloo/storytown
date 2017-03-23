@@ -15,6 +15,7 @@ import           Control.Monad.Trans.AWS
 import           Control.Monad.Trans.Class           (lift)
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource        (ResourceT)
+import qualified Data.ByteString.Base64              as BS64
 import qualified Data.ByteString.Char8               as BS
 import qualified Data.ByteString.Lazy.Char8          as LBS
 import           Data.Text                           (Text)
@@ -30,7 +31,9 @@ import qualified Network.Wai.Middleware.Cors         as Cors
 import           Servant
 import           Servant.Auth.Server
 import           Servant.Auth.Server.SetCookieOrphan ()
+import qualified System.Entropy
 import           System.IO                           (stdout)
+import qualified Web.Cookie                          as Cookie
 
 import           Api
 import           Environment
@@ -46,8 +49,15 @@ startApp :: Config -> IO Application
 startApp cfg = do
   myKey <- generateKey
   let jwtCfg = defaultJWTSettings myKey
-      ctx = defaultCookieSettings :. jwtCfg :. EmptyContext
-      api = Proxy :: Proxy (API '[JWT])
+      cookieSettings =
+        defaultCookieSettings {
+          cookiePath = Just "/"
+        , xsrfCookieName = "XSRF-TOKEN"
+        , xsrfHeaderName = "X-XSRF-TOKEN"
+        , xsrfCookiePath = Just "/"
+        }
+      ctx = cookieSettings :. jwtCfg :. EmptyContext
+      api = Proxy :: Proxy (API '[Cookie])
 
   DB.runSqlPool (DB.runMigration Api.migrateAll) (pool cfg)
   let corsPolicy = Cors.simpleCorsResourcePolicy {
@@ -60,7 +70,7 @@ startApp cfg = do
     $ Cors.cors (const $ Just corsPolicy)
     $ serveWithContext api ctx
     $ enter (myHandlerToHandler cfg (e & envLogger .~ l))
-        (server defaultCookieSettings jwtCfg)
+        (server cookieSettings jwtCfg)
       :<|> serveDirectory "assets"
 
 type MyHandler = ReaderT Config (AWST (ResourceT Handler))
@@ -82,30 +92,45 @@ protected :: AuthResult User -> MyServer Protected
 protected (Authenticated user) =
        return (firstName user)
   :<|> return (email user)
-  -- :<|> itemServer
   :<|> storyServer
   :<|> getSignedPutObjectRequest
-protected _ = throwAll err401
+protected e =
+    throwAll err401
 
 unprotected :: CookieSettings -> JWTSettings -> MyServer Unprotected
 unprotected = checkCreds
 
-checkCreds :: CookieSettings -> JWTSettings -> Login -> MyHandler AuthData
+checkCreds :: CookieSettings -> JWTSettings -> Login
+    -> MyHandler
+        (Headers
+          '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie]
+          AuthData
+        )
 checkCreds cookieSettings jwtSettings (Login "" "") = do
-   let usr = User {
-     userId = 0
-   , firstName = "Ali"
-   , lastName = "Baba"
-   , email = "ali@email.com"
-   , group = "Teacher"
-   }
-   etoken <- liftIO $ makeJWT usr jwtSettings Nothing
-   case etoken of
-     Left e     -> throwError err401
-     Right token -> return AuthData {
-        jwt = LBS.unpack token
-      , user = usr
-    }
+     let usr = User {
+       userId = 0
+     , firstName = "Ali"
+     , lastName = "Baba"
+     , email = "ali@email.com"
+     , group = "Teacher"
+     }
+     mcookie <- liftIO $ makeCookie cookieSettings jwtSettings usr
+     csrfCookie <- do
+       csrf <- liftIO $ BS64.encode <$> System.Entropy.getEntropy 32
+       return Cookie.def {
+          Cookie.setCookieName = xsrfCookieName cookieSettings
+        , Cookie.setCookieValue = csrf
+        , Cookie.setCookieSecure = True
+        , Cookie.setCookiePath = xsrfCookiePath cookieSettings
+        }
+     case mcookie of
+       Nothing     -> throwError err401
+       Just cookie -> return
+        $ addHeader csrfCookie
+        $ addHeader cookie
+        AuthData {
+            user = usr
+        }
 checkCreds _ _ _ = throwError err401
 
 

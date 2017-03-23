@@ -41,7 +41,7 @@ update message s =
 
         LoginButton ->
             s
-                ! [ Server.send s.auth
+                ! [ Server.send
                         AuthDataReceived
                         (Api.postLogin (Login s.usernameInput s.passwordInput))
                   ]
@@ -64,10 +64,7 @@ update message s =
             in
                 { s
                     | auth =
-                        Just
-                            { jwt = authUnsafe.jwt
-                            , group = toSafe authUnsafe.user.group
-                            }
+                        Just { group = toSafe authUnsafe.user.group }
                 }
                     ! []
                     :> gotoRoute Dashboard
@@ -81,7 +78,7 @@ update message s =
             case s.story of
                 RD.Success draft ->
                     s
-                        ! [ Server.send s.auth
+                        ! [ Server.send
                                 (always StoryCreatedOrUpdated)
                                 (Api.putApiStoryById storyId
                                     (storyFromDraft draft)
@@ -95,7 +92,7 @@ update message s =
             case s.story of
                 RD.Success story ->
                     s
-                        ! [ Server.send s.auth
+                        ! [ Server.send
                                 (always StoryCreatedOrUpdated)
                                 (Api.postApiStory (storyFromDraft story))
                           ]
@@ -169,7 +166,6 @@ update message s =
                 Just itemid ->
                     { s | recordingId = Nothing }
                         ! [ Server.send
-                                s.auth
                                 (S3SignedRequestAudio itemid blob)
                                 (Api.getApiS3ByDir "audio")
                           ]
@@ -379,7 +375,7 @@ setupRoute route s =
 
         StoryPage (Routing.Existing storyid) ->
             { s | story = RD.Loading }
-                ! [ Server.sendW s.auth
+                ! [ Server.sendW
                         StoryReceived
                         (Api.getApiStoryById storyid)
                   ]
@@ -393,7 +389,7 @@ setupRoute route s =
 
         Dashboard ->
             s
-                ! [ Server.sendW s.auth
+                ! [ Server.sendW
                         StoriesReceived
                         Api.getApiStory
                   ]

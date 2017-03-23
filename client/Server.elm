@@ -2,47 +2,54 @@ module Server exposing (send, sendW)
 
 import Message exposing (Msg(..))
 import Model exposing (..)
+import CsrfCookie
 import Http
+import Task
 import HttpBuilder as HttpB
 import RemoteData as RD
 
 
 send :
-    Maybe AuthData
-    -> (a -> Msg)
+    (a -> Msg)
     -> HttpB.RequestBuilder a
     -> Cmd Msg
-send auth tag =
-    Http.send (handleHttpError tag Nothing)
-        << reqWithAuth auth
+send tag =
+    sendWithCsrfToken (handleHttpError tag Nothing)
 
 
 sendW :
-    Maybe AuthData
-    -> (Web a -> Msg)
+    (Web a -> Msg)
     -> HttpB.RequestBuilder a
     -> Cmd Msg
-sendW auth tag =
-    Http.send
+sendW tag =
+    sendWithCsrfToken
         (handleHttpError
             (tag << RD.succeed)
             (Just (tag << RD.Failure << always ()))
         )
-        << reqWithAuth auth
 
 
-reqWithAuth :
-    Maybe AuthData
+sendWithCsrfToken :
+    (Result Http.Error a -> msg)
     -> HttpB.RequestBuilder a
-    -> Http.Request a
-reqWithAuth auth =
-    HttpB.toRequest
-        << case auth of
-            Nothing ->
-                identity
+    -> Cmd msg
+sendWithCsrfToken handler req =
+    CsrfCookie.csrfCookie ()
+        |> Task.map Just
+        |> Task.onError (always (Task.succeed Nothing))
+        |> Task.andThen
+            (\mcsrf ->
+                req
+                    |> (case mcsrf of
+                            Nothing ->
+                                identity
 
-            Just auth ->
-                HttpB.withHeader "Authorization" ("Bearer " ++ auth.jwt)
+                            Just csrf ->
+                                HttpB.withHeader "X-XSRF-TOKEN" csrf
+                       )
+                    |> HttpB.toTask
+            )
+        |> Task.attempt handler
 
 
 handleHttpError :
@@ -61,10 +68,10 @@ handleHttpError tag tagE r =
                     if resp.status.message == "Unauthorized" then
                         UnauthorizedError
                     else
-                        showError e
+                        Maybe.withDefault showError tagE e
 
                 _ ->
-                    showError e
+                    Maybe.withDefault showError tagE e
 
 
 showError =

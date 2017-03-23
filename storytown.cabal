@@ -41,6 +41,10 @@ executable aws
     , time
     , resourcet
     , text
+    , warp-tls
+    , entropy
+    , base64-bytestring
+    , cookie
   default-language: Haskell2010
 
 executable server
@@ -77,6 +81,10 @@ executable server
     , time
     , resourcet
     , text
+    , warp-tls
+    , entropy
+    , base64-bytestring
+    , cookie
   other-modules:
       Api
       App
@@ -119,6 +127,10 @@ test-suite spec
     , time
     , resourcet
     , text
+    , warp-tls
+    , entropy
+    , base64-bytestring
+    , cookie
     , warp >= 3.2.3
     , hspec
     , servant-client

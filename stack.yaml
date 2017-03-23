@@ -12,6 +12,12 @@ packages:
   subdirs:
   - amazonka-s3
   extra-dep: True
+- location:
+    git: git@github.com:iteloo/servant-auth.git
+    commit: 7887155d54c9f9ba8a5350962b1530b4296c69f3
+  subdirs:
+  - servant-auth-server
+  extra-dep: True
 
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
