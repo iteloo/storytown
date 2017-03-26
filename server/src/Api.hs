@@ -89,7 +89,7 @@ instance ToJSON Login
 instance FromJSON Login
 instance ElmType Login
 
-data AuthData = AuthData {
+newtype AuthData = AuthData {
     user :: User
 } deriving (Eq, Show, Read, Generic)
 
@@ -118,8 +118,7 @@ type SubAPI auths =
   :<|> Unprotected
 
 type Protected =
-       "name" :> Get '[JSON] Text
-  :<|> "email" :> Get '[JSON] String
+       "user" :> Get '[JSON] User
   :<|> "story" :> StoryApi
   :<|> "s3" :> S3Api
 
@@ -129,7 +128,10 @@ type S3Api =
 type Unprotected =
   "login"
     :> ReqBody '[JSON] Login
-    :> Post '[JSON] (Headers '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] AuthData)
+    :> Post '[JSON]
+      (Headers
+        '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie]
+        AuthData)
 
 type StoryApi =
        Get '[JSON] [(StoryId, Story)]

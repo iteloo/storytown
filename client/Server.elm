@@ -65,7 +65,7 @@ handleHttpError tag tagE r =
         Err e ->
             case e of
                 Http.BadStatus resp ->
-                    if resp.status.message == "Unauthorized" then
+                    if resp.status.code == 401 then
                         UnauthorizedError
                     else
                         Maybe.withDefault showError tagE e

@@ -1,38 +1,124 @@
-module Update exposing (update, urlChange)
+module Update exposing (init, subs, update)
 
-import Model
-    exposing
-        ( Model
-        , init
-        , UserGroup(..)
-        , StoryEdit
-        , PlaybackState(..)
-        , duration
-        , currentItemState
-        )
-import Message exposing (Msg(..))
-import Routing exposing (Route(..), parsePath, makePath)
+import Model exposing (..)
+import Message exposing (..)
+import Routing
 import Server
 import S3
-import Api exposing (Item, Login)
+import Api
 import Audio
 import MediaRecorder as MR
-import List
 import Dict
-import Navigation as Nav
-import Update.Extra.Infix exposing ((:>))
 import Task
-import Http
-import RemoteData as RD
 import Time
 import Process
-import List.Zipper as Zipper
+import Navigation as Nav
+import Update.Extra.Infix exposing ((:>))
+import RemoteData as RD
+
+
+init : Nav.Location -> ( Model, Cmd Msg )
+init loc =
+    { error = Nothing
+    , app =
+        NotReady
+            { startingLocation = loc
+            , user = Nothing
+            }
+    }
+        ! [ Server.send (NotReadyMsg << UserReceived) Api.getApiUser ]
+
+
+subs =
+    Audio.onStateChange (ReadyMsg << StoryEditMsg << PlaybackStateChanged)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message s =
     case message of
-        -- LOGIN: UI
+        -- ROUTING
+        UrlChange loc ->
+            urlChange loc s
+
+        -- ERROR
+        Error msg ->
+            error msg s
+
+        UnauthorizedError ->
+            error "Unauthorized!" s
+                :> gotoRoute Routing.Login
+
+        NotReadyMsg msg ->
+            case s.app of
+                NotReady nr ->
+                    case msg of
+                        UserReceived user ->
+                            { s
+                                | app =
+                                    NotReady
+                                        { nr
+                                            | user = Just (apiUserToUser user)
+                                        }
+                            }
+                                ! []
+                                :> urlChange nr.startingLocation
+
+                Ready _ ->
+                    badMsgState message s
+
+        ReadyMsg msg ->
+            case s.app of
+                NotReady _ ->
+                    badMsgState message s
+
+                Ready app ->
+                    let
+                        ( newS, cmd ) =
+                            updateReady msg app
+                    in
+                        { s | app = Ready newS } ! [ cmd ]
+
+
+updateReady : ReadyMsg -> ReadyModel -> ( ReadyModel, Cmd Msg )
+updateReady msg s =
+    case ( msg, s ) of
+        ( LoginMsg msg, LoginPage s ) ->
+            let
+                ( newS, cmd ) =
+                    updateLogin { toMsg = ReadyMsg << LoginMsg } msg s
+            in
+                LoginPage newS ! [ cmd ]
+
+        ( DashboardMsg msg, Dashboard s ) ->
+            let
+                ( newS, cmd ) =
+                    updateDashboard { toMsg = ReadyMsg << DashboardMsg } msg s
+            in
+                Dashboard newS ! [ cmd ]
+
+        ( StoryEditMsg msg, StoryEditPage s ) ->
+            let
+                ( newS, cmd ) =
+                    updateStoryEdit { toMsg = ReadyMsg << StoryEditMsg } msg s
+            in
+                StoryEditPage newS ! [ cmd ]
+
+        _ ->
+            badMsgState msg s
+
+
+
+-- badMsgState msg s
+
+
+updateLogin :
+    { toMsg : LoginMsg -> Msg }
+    -> LoginMsg
+    -> LoginModel
+    -> ( LoginModel, Cmd Msg )
+updateLogin { toMsg } msg s =
+    case msg of
+        -- UI
         UsernameInputChange t ->
             { s | usernameInput = t } ! []
 
@@ -42,44 +128,44 @@ update message s =
         LoginButton ->
             s
                 ! [ Server.send
-                        AuthDataReceived
-                        (Api.postLogin (Login s.usernameInput s.passwordInput))
+                        (toMsg << AuthDataReceived)
+                        (Api.postLogin
+                            (Api.Login s.usernameInput s.passwordInput)
+                        )
                   ]
 
-        -- LOGIN: SERVER
+        -- SERVER
         AuthDataReceived authUnsafe ->
-            -- [problem] assumes token is always valid
-            let
-                toSafe groupUnsafe =
-                    case groupUnsafe of
-                        "Teacher" ->
-                            Teacher
+            { s | user = Just (apiUserToUser authUnsafe.user) }
+                ! []
+                :> gotoRoute (Maybe.withDefault Routing.Dashboard s.redirect)
 
-                        "Student" ->
-                            Student
 
-                        str ->
-                            Debug.crash
-                                ("Cannot decode UserGroup value :" ++ str)
-            in
-                { s
-                    | auth =
-                        Just { group = toSafe authUnsafe.user.group }
-                }
-                    ! []
-                    :> gotoRoute Dashboard
-
-        -- DASHBOARD
+updateDashboard :
+    { toMsg : DashboardMsg -> Msg }
+    -> DashboardMsg
+    -> DashboardModel
+    -> ( DashboardModel, Cmd Msg )
+updateDashboard { toMsg } message s =
+    case message of
         StoriesReceived stories ->
             { s | stories = stories } ! []
 
-        -- ITEM LIST: UI
+
+updateStoryEdit :
+    { toMsg : StoryEditMsg -> Msg }
+    -> StoryEditMsg
+    -> StoryEditModel
+    -> ( StoryEditModel, Cmd Msg )
+updateStoryEdit { toMsg } message s =
+    case message of
+        -- UI
         ApplyButton storyId ->
             case s.story of
                 RD.Success draft ->
                     s
                         ! [ Server.send
-                                (always StoryCreatedOrUpdated)
+                                (toMsg << always StoryCreatedOrUpdated)
                                 (Api.putApiStoryById storyId
                                     (storyFromDraft draft)
                                 )
@@ -93,7 +179,7 @@ update message s =
                 RD.Success story ->
                     s
                         ! [ Server.send
-                                (always StoryCreatedOrUpdated)
+                                (toMsg << always StoryCreatedOrUpdated)
                                 (Api.postApiStory (storyFromDraft story))
                           ]
 
@@ -106,7 +192,7 @@ update message s =
                     { sty
                         | sentences =
                             Dict.insert sty.freshIndex
-                                (Item "" Nothing)
+                                (Api.Item "" Nothing)
                                 sty.sentences
                         , freshIndex = sty.freshIndex + 1
                     }
@@ -126,7 +212,7 @@ update message s =
                 )
                 s
 
-        -- ITEM LIST: SERVER
+        -- SERVER
         StoryReceived story ->
             { s
                 | story =
@@ -146,9 +232,9 @@ update message s =
         StoryCreatedOrUpdated ->
             { s | story = RD.NotAsked }
                 ! []
-                :> gotoRoute Dashboard
+                :> gotoRoute Routing.Dashboard
 
-        -- ITEM LIST: AUDIO: UI
+        -- REC: UI
         RecordButton itemid ->
             case s.recordingId of
                 Nothing ->
@@ -157,7 +243,7 @@ update message s =
                 Just itemid ->
                     stopRecording s
 
-        -- ITEM LIST: AUDIO: NATIVE
+        -- REC: NATIVE
         FileReady ( url, blob ) ->
             case s.recordingId of
                 Nothing ->
@@ -166,7 +252,7 @@ update message s =
                 Just itemid ->
                     { s | recordingId = Nothing }
                         ! [ Server.send
-                                (S3SignedRequestAudio itemid blob)
+                                (toMsg << S3SignedRequestAudio itemid blob)
                                 (Api.getApiS3ByDir "audio")
                           ]
                         :> updateSentences
@@ -176,20 +262,21 @@ update message s =
                                 )
                             )
 
-        -- ITEM LIST: AUDIO: SERVER
+        -- REC: SERVER
         S3SignedRequestAudio itemid blob reqUrl ->
             s
                 ! [ S3.send
-                        (always
-                            (S3UploadDone
-                                (S3.baseUrlFromSignedUrl reqUrl)
-                                itemid
-                            )
+                        (toMsg
+                            << always
+                                (S3UploadDone
+                                    (S3.baseUrlFromSignedUrl reqUrl)
+                                    itemid
+                                )
                         )
                         (S3.putObject reqUrl blob)
                   ]
 
-        -- ITEM LIST: AUDIO: S3
+        -- REC: S3
         S3UploadDone baseUrl itemid ->
             updateSentences
                 (\ss ->
@@ -242,7 +329,8 @@ update message s =
                                     Debug.log "no item found" Cmd.none
 
                                 Just i ->
-                                    delay (i.end - ct) (NextSentence cnt)
+                                    delay (i.end - ct)
+                                        (toMsg <| NextSentence cnt)
 
                         _ ->
                             Cmd.none
@@ -261,24 +349,14 @@ update message s =
 
                             Just i ->
                                 { s | playbackState = Playing cnt i.start ts }
-                                    ! [ delay (duration i) (NextSentence cnt) ]
+                                    ! [ delay (duration i)
+                                            (toMsg <| NextSentence cnt)
+                                      ]
                     else
                         s ! []
 
                 _ ->
                     s ! []
-
-        -- ROUTING
-        UrlChange loc ->
-            urlChange loc s
-
-        -- ERROR
-        Error msg ->
-            error msg s
-
-        UnauthorizedError ->
-            error "Unauthorized!" s
-                :> gotoRoute LoginPage
 
         -- TEST
         -- [todo] do something nontrivial
@@ -293,7 +371,10 @@ update message s =
 startRecording itemid s =
     -- [todo] adds error handling
     { s | recordingId = Just itemid }
-        ! [ Task.attempt TestNativeStart (MR.start ()) ]
+        ! [ Task.attempt
+                (ReadyMsg << StoryEditMsg << TestNativeStart)
+                (MR.start ())
+          ]
 
 
 stopRecording s =
@@ -306,7 +387,7 @@ stopRecording s =
                             Debug.crash "audio file failed to be prepared"
 
                         Ok r ->
-                            FileReady r
+                            (ReadyMsg << StoryEditMsg << FileReady) r
                 )
                 (MR.stop ())
           ]
@@ -316,7 +397,7 @@ stopRecording s =
 -- STORY EDIT
 
 
-storyFromDraft : StoryEdit -> Api.Story
+storyFromDraft : StoryDraft -> Api.Story
 storyFromDraft draft =
     { title = draft.title
     , sentences = Dict.values draft.sentences
@@ -327,72 +408,126 @@ storyFromDraft draft =
 -- ROUTING
 
 
-urlChange loc s =
-    case parsePath loc of
-        Nothing ->
-            error "Cannot parse path" s
-
-        Just route ->
-            maybeReroute route s
-
-
-maybeReroute route s =
-    let
-        finishWithoutReroute route s =
-            { s | route = route, history = s.route :: s.history }
-                ! []
-                :> setupRoute route
-    in
-        case route of
-            LoginPage ->
-                finishWithoutReroute LoginPage s
-
-            _ ->
-                case s.auth of
-                    Nothing ->
-                        gotoRoute LoginPage s
-
-                    Just auth ->
-                        finishWithoutReroute route s
-
-
+gotoRoute : Routing.Route -> model -> ( model, Cmd Msg )
 gotoRoute route s =
-    s ! [ Nav.newUrl (makePath route) ]
+    s ! [ Nav.newUrl (Routing.makePath route) ]
 
 
-setupRoute route s =
+urlChange : Nav.Location -> Model -> ( Model, Cmd Msg )
+urlChange loc s =
+    let
+        go =
+            case Routing.parsePath loc of
+                Nothing ->
+                    -- error "Cannot parse path" s
+                    Debug.crash "Cannot parse path"
+
+                Just route ->
+                    let
+                        ( newApp, cmd ) =
+                            routeChange route s.app
+                    in
+                        { s | app = newApp } ! [ cmd ]
+    in
+        case s.app of
+            NotReady nr ->
+                -- [hack] tmp; add more context in the future
+                if True then
+                    go
+                else
+                    { s | app = NotReady { nr | startingLocation = loc } } ! []
+
+            Ready _ ->
+                go
+
+
+routeChange : Routing.Route -> AppModel -> ( AppModel, Cmd Msg )
+routeChange route app =
     case route of
-        StoryPage (Routing.New) ->
-            { s
-                | story =
-                    RD.succeed
-                        { title = "Untitled"
-                        , freshIndex = 0
-                        , sentences = Dict.empty
-                        }
-            }
-                ! []
+        Routing.StoryNew ->
+            defaultLogin app <|
+                \user ->
+                    let
+                        s =
+                            initStoryEdit user New
+                    in
+                        StoryEditPage
+                            { s
+                                | story =
+                                    RD.succeed
+                                        { title = "Untitled"
+                                        , freshIndex = 0
+                                        , sentences = Dict.empty
+                                        }
+                                , mode = New
+                            }
+                            ! []
 
-        StoryPage (Routing.Existing storyid) ->
-            { s | story = RD.Loading }
-                ! [ Server.sendW
-                        StoryReceived
-                        (Api.getApiStoryById storyid)
-                  ]
+        Routing.StoryEdit storyid ->
+            defaultLogin app <|
+                \user ->
+                    let
+                        s =
+                            initStoryEdit user (Existing storyid)
+                    in
+                        StoryEditPage
+                            { s
+                                | story = RD.Loading
+                                , mode = Existing storyid
+                            }
+                            ! [ Server.sendW
+                                    (ReadyMsg << StoryEditMsg << StoryReceived)
+                                    (Api.getApiStoryById storyid)
+                              ]
 
-        LoginPage ->
-            { s
-                | usernameInput = ""
-                , passwordInput = ""
-            }
-                ! []
+        Routing.Login ->
+            defaultLogin app <|
+                \user ->
+                    LoginPage (initLoginWithUser user) ! []
 
-        Dashboard ->
-            s
-                ! [ Server.sendW
-                        StoriesReceived
-                        Api.getApiStory
-                  ]
+        Routing.Dashboard ->
+            defaultLogin app <|
+                \user ->
+                    Dashboard (initDashboard user)
+                        ! [ Server.sendW
+                                (ReadyMsg << DashboardMsg << StoriesReceived)
+                                Api.getApiStory
+                          ]
+
+
+defaultLogin :
+    AppModel
+    -> (User -> ( ReadyModel, Cmd Msg ))
+    -> ( AppModel, Cmd Msg )
+defaultLogin app newAppWithAuth =
+    case user app of
+        Nothing ->
+            Ready (LoginPage initLogin) ! []
+
+        Just user ->
+            let
+                ( newS, cmd ) =
+                    newAppWithAuth user
+            in
+                Ready newS ! [ cmd ]
+
+
+user : AppModel -> Maybe User
+user app =
+    case app of
+        NotReady nr ->
+            nr.user
+
+        Ready app ->
+            case app of
+                LoginPage page ->
+                    page.user
+
+                Dashboard page ->
+                    Just page.user
+
+                StoryEditPage page ->
+                    Just page.user
 
 
 
@@ -407,12 +542,16 @@ error msg s =
 -- HELPERS
 
 
+badMsgState msg s =
+    Debug.log "bad msg-state combo!" ( msg, s ) |> \_ -> s ! []
+
+
 updateStory f s =
     { s | story = RD.map f s.story } ! []
 
 
 updateSentences f s =
-    s ! [] :> updateStory (\sty -> { sty | sentences = f sty.sentences })
+    updateStory (\sty -> { sty | sentences = f sty.sentences }) s
 
 
 delay : Time.Time -> msg -> Cmd msg
@@ -420,16 +559,3 @@ delay time msg =
     Process.sleep time
         |> Task.andThen (always <| Task.succeed msg)
         |> Task.perform identity
-
-
-sequenceMaybe : List (Maybe a) -> Maybe (List a)
-sequenceMaybe =
-    List.foldr (\m -> Maybe.andThen (\l -> Maybe.map (flip (::) l) m))
-        (Just [])
-
-
-testUrls =
-    [ "https://upload.wikimedia.org/wikipedia/commons/4/4f/Hu-ad%C3%B3.ogg"
-    , "https://upload.wikimedia.org/wikipedia/commons/d/d3/Hu-adni.ogg"
-    , "https://upload.wikimedia.org/wikipedia/commons/f/fe/Hu-adekv%C3%A1t.ogg"
-    ]

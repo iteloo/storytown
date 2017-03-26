@@ -9,7 +9,6 @@ module S3
 import Model exposing (Web)
 import Message exposing (Msg(..))
 import Http
-import HttpBuilder as HttpB
 import RemoteData as RD
 import MediaRecorder as MR
 import Debug

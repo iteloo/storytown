@@ -21,6 +21,7 @@ import qualified Data.ByteString.Lazy.Char8          as LBS
 import           Data.Text                           (Text)
 import qualified Data.Text                           as Text
 import qualified Data.Time                           as Time
+import qualified Data.Time.Clock                     as Time
 import qualified Data.Time.Clock.POSIX               as Time
 import           Database.Persist                    ((==.))
 import qualified Database.Persist                    as DB
@@ -48,10 +49,13 @@ data Config = Config {
 startApp :: Config -> IO Application
 startApp cfg = do
   myKey <- generateKey
+  now <- Time.getCurrentTime
   let jwtCfg = defaultJWTSettings myKey
       cookieSettings =
         defaultCookieSettings {
           cookiePath = Just "/"
+        , cookieExpires = Just now
+            { Time.utctDay = Time.addDays 30 (Time.utctDay now) }
         , xsrfCookieName = "XSRF-TOKEN"
         , xsrfHeaderName = "X-XSRF-TOKEN"
         , xsrfCookiePath = Just "/"
@@ -90,8 +94,7 @@ server cs jwts =
 
 protected :: AuthResult User -> MyServer Protected
 protected (Authenticated user) =
-       return (firstName user)
-  :<|> return (email user)
+       return user
   :<|> storyServer
   :<|> getSignedPutObjectRequest
 protected e =

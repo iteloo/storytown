@@ -1,44 +1,67 @@
-module Message exposing (Msg(..))
+module Message exposing (..)
 
 import Model exposing (..)
-import Api exposing (Item, Story)
-import Routing exposing (Route)
+import Api
 import MediaRecorder as MR
 import Navigation as Nav
 import RemoteData as RD
 import Http
-import List.Zipper exposing (Zipper)
-import Time
 
 
 type Msg
-    = -- LOGIN: UI
+    = -- ROUTING
+      UrlChange Nav.Location
+      -- ERROR
+    | Error String
+    | UnauthorizedError
+      -- CHILDREN
+    | NotReadyMsg NotReadyMsg
+    | ReadyMsg ReadyMsg
+
+
+type NotReadyMsg
+    = UserReceived Api.User
+
+
+type ReadyMsg
+    = LoginMsg LoginMsg
+    | DashboardMsg DashboardMsg
+    | StoryEditMsg StoryEditMsg
+
+
+type LoginMsg
+    = -- UI
       UsernameInputChange String
     | PasswordInputChange String
     | LoginButton
-      -- LOGIN: SERVER
+      -- SERVER
     | AuthDataReceived Api.AuthData
-      -- DASHBOARD
-    | StoriesReceived (Web (List ( StoryId, Story )))
-      -- ITEM LIST: UI
-    | AddBelowButton Int
+
+
+type DashboardMsg
+    = StoriesReceived (Web (List ( StoryId, Api.Story )))
+
+
+type StoryEditMsg
+    = -- UI
+      AddBelowButton Int
     | ApplyButton StoryId
     | CreateButton
     | DeleteButton ItemId
     | TextClicked ItemId
     | ItemSourceChange Int String
-      -- ITEM LIST: SERVER
-    | StoryReceived (Web Story)
+      -- SERVER
+    | StoryReceived (Web Api.Story)
     | StoryCreatedOrUpdated
-      -- ITEM LIST: AUDIO: UI
+      -- REC: UI
     | RecordButton ItemId
-      -- ITEM LIST: AUDIO: NATIVE
+      -- REC: NATIVE
     | FileReady ( String, MR.Blob )
-      -- ITEM LIST: AUDIO: SERVER
+      -- REC: SERVER
     | S3SignedRequestAudio ItemId MR.Blob String
-      -- ITEM LIST: AUDIO: S3
+      -- REC: S3
     | S3UploadDone String ItemId
-      -- PLAYBACKj
+      -- PLAYBACK
     | PlayButton
     | RewindButton
     | FastForwardButton
@@ -46,10 +69,5 @@ type Msg
     | Rewinded (Result () ())
     | PlaybackStateChanged PlaybackState
     | NextSentence Int
-      -- ROUTING
-    | UrlChange Nav.Location
-      -- ERROR
-    | Error String
-    | UnauthorizedError
       -- TEST
     | TestNativeStart (Result MR.Error ())

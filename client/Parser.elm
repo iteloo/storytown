@@ -1,6 +1,10 @@
-module Parser exposing (parseTranslatedText, TranslatedText, TranslatedBlock(..))
+module Parser
+    exposing
+        ( parseTranslatedText
+        , TranslatedText
+        , TranslatedBlock(..)
+        )
 
-import Html exposing (text)
 import Combine exposing (..)
 import Combine.Char exposing (..)
 import List.Nonempty as NList exposing (Nonempty, (:::))

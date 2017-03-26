@@ -1,57 +1,47 @@
-module View exposing (..)
+module View exposing (view)
 
-import Model
-    exposing
-        ( Model
-        , ItemId
-        , StoryId
-        , UserGroup(..)
-        , PlaybackState(..)
-        , isLoaded
-        , isPaused
-        , isPlaying
-        , currentItemState
-        )
-import Message exposing (Msg(..))
-import Routing exposing (Route(..))
-import Api exposing (Item)
+import Model exposing (..)
+import Message exposing (..)
 import Parser
+import Routing
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Dict
 import RemoteData as RD
 import List.Nonempty as NList
-import Json.Encode exposing (string)
+import Json.Encode as Enc
 
 
 view : Model -> Html Msg
 view s =
     div []
         [ Html.node "link"
-            [ property "rel" (string "stylesheet")
-            , property "type" (string "text/css")
-            , property "href" (string "style.css")
+            [ property "rel" (Enc.string "stylesheet")
+            , property "type" (Enc.string "text/css")
+            , property "href" (Enc.string "style.css")
             ]
             []
-        , div [] <|
-            [ case s.route of
-                LoginPage ->
-                    loginView
+        , case s.app of
+            NotReady s ->
+                text "App loading..."
 
-                StoryPage mode ->
-                    itemsView mode s
+            Ready s ->
+                Html.map ReadyMsg <|
+                    case s of
+                        Model.LoginPage s ->
+                            Html.map LoginMsg loginView
 
-                Dashboard ->
-                    dashboardView s
-            , br [] []
-            , br [] []
-            , text (toString s)
-            ]
+                        Dashboard s ->
+                            Html.map DashboardMsg (dashboardView s)
+
+                        StoryEditPage s ->
+                            Html.map StoryEditMsg (itemsView s)
+        , text (toString s)
         ]
 
 
-loginView : Html Msg
+loginView : Html LoginMsg
 loginView =
     div [] <|
         [ input [ onInput UsernameInputChange ] []
@@ -64,18 +54,14 @@ loginView =
 -- DASHBOARD
 
 
+dashboardView : DashboardModel -> Html DashboardMsg
 dashboardView s =
-    case s.auth of
-        Nothing ->
-            br [] []
+    case s.user.group of
+        Teacher ->
+            teacherDashboard s
 
-        Just auth ->
-            case auth.group of
-                Teacher ->
-                    teacherDashboard s
-
-                Student ->
-                    text "student dashboard"
+        Student ->
+            text "student dashboard"
 
 
 teacherDashboard s =
@@ -83,7 +69,11 @@ teacherDashboard s =
         [ text "Teacher Dashboard"
         , br [] []
         , a
-            [ href (Routing.makePath (StoryPage Routing.New)) ]
+            [ href
+                (Routing.makePath
+                    (Routing.StoryNew)
+                )
+            ]
             [ text "New Story" ]
         , case s.stories of
             RD.NotAsked ->
@@ -103,7 +93,7 @@ teacherDashboard s =
 storyItemView ( storyId, story ) =
     li []
         [ a
-            [ href (Routing.makePath (StoryPage (Routing.Existing storyId))) ]
+            [ href (Routing.makePath (Routing.StoryEdit storyId)) ]
             [ text story.title ]
         ]
 
@@ -112,7 +102,8 @@ storyItemView ( storyId, story ) =
 -- ITEM VIEW
 
 
-itemsView mode s =
+itemsView : StoryEditModel -> Html StoryEditMsg
+itemsView s =
     div []
         [ playbackView s
         , case s.story of
@@ -132,11 +123,11 @@ itemsView mode s =
                             (\index item -> itemView s index item)
                             story.sentences
         , button [ onClick (AddBelowButton 0) ] [ text "+" ]
-        , case mode of
-            Routing.New ->
+        , case s.mode of
+            New ->
                 button [ onClick CreateButton ] [ text "Create" ]
 
-            Routing.Existing storyId ->
+            Existing storyId ->
                 button [ onClick (ApplyButton storyId) ] [ text "Apply" ]
         ]
 
@@ -221,7 +212,7 @@ transView trans =
         ]
 
 
-transBlockView : Parser.TranslatedBlock -> Html Msg
+transBlockView : Parser.TranslatedBlock -> Html StoryEditMsg
 transBlockView block =
     case block of
         Parser.L2Word w ->

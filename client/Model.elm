@@ -1,12 +1,23 @@
 module Model
     exposing
         ( Model
-        , init
+        , AppModel(..)
+        , NotReadyModel
+        , ReadyModel(..)
+        , LoginModel
+        , initLogin
+        , initLoginWithUser
+        , DashboardModel
+        , initDashboard
+        , StoryEditModel
+        , StoryEditMode(..)
+        , initStoryEdit
         , StoryId
         , ItemId
-        , AuthData
+        , User
         , UserGroup(..)
-        , StoryEdit
+        , apiUserToUser
+        , StoryDraft
         , Web
         , PlaybackState(..)
         , PlaybackItemState
@@ -17,53 +28,90 @@ module Model
         , currentItemState
         )
 
-import Routing exposing (Route(..))
-import Api exposing (Story, Item)
+import Routing
+import Api
 import Dict
 import RemoteData as RD
 import Time
+import Navigation as Nav
 import List.Zipper exposing (Zipper)
 
 
 type alias Model =
-    { -- LOGIN
-      usernameInput : String
-    , passwordInput :
-        String
-        -- DASHBOARD
-    , stories :
-        Web (List ( StoryId, Story ))
-        -- ITEM LIST
-    , story : Web StoryEdit
-    , recordingId :
-        Maybe ItemId
-        -- PLAYBACK
-    , playbackState :
-        PlaybackState
+    { app :
+        AppModel
         -- ERROR
-    , error :
-        Maybe String
-        -- CONTEXT
-    , auth : Maybe AuthData
-    , route : Route
-    , history : List Route
+    , error : Maybe String
     }
 
 
-init : Model
-init =
+type AppModel
+    = NotReady NotReadyModel
+    | Ready ReadyModel
+
+
+type alias NotReadyModel =
+    { startingLocation : Nav.Location
+    , user : Maybe User
+    }
+
+
+type ReadyModel
+    = LoginPage LoginModel
+    | Dashboard DashboardModel
+    | StoryEditPage StoryEditModel
+
+
+type alias LoginModel =
+    { usernameInput : String
+    , passwordInput : String
+    , redirect : Maybe Routing.Route
+    , user : Maybe User
+    }
+
+
+initLogin : LoginModel
+initLogin =
     { usernameInput = ""
     , passwordInput = ""
-    , stories = RD.NotAsked
-    , story = RD.NotAsked
+    , redirect = Nothing
+    , user = Nothing
+    }
+
+
+initLoginWithUser : User -> LoginModel
+initLoginWithUser user =
+    { initLogin | user = Just user }
+
+
+type alias DashboardModel =
+    { stories : Web (List ( StoryId, Api.Story ))
+    , user : User
+    }
+
+
+initDashboard : User -> DashboardModel
+initDashboard user =
+    { stories = RD.NotAsked
+    , user = user
+    }
+
+
+type alias StoryEditModel =
+    { story : Web StoryDraft
+    , recordingId : Maybe ItemId
+    , playbackState : PlaybackState
+    , user : User
+    , mode : StoryEditMode
+    }
+
+
+initStoryEdit user mode =
+    { story = RD.NotAsked
     , recordingId = Nothing
     , playbackState = NotLoaded
-    , error = Nothing
-    , auth =
-        Nothing
-        -- bogus value; will call update
-    , route = LoginPage
-    , history = []
+    , user = user
+    , mode = mode
     }
 
 
@@ -75,8 +123,12 @@ type alias ItemId =
     Int
 
 
-type alias AuthData =
-    { group : UserGroup
+type alias User =
+    { userId : Int
+    , firstName : String
+    , lastName : String
+    , email : String
+    , group : UserGroup
     }
 
 
@@ -85,15 +137,43 @@ type UserGroup
     | Student
 
 
+apiUserToUser : Api.User -> User
+apiUserToUser apiUser =
+    let
+        toSafe groupUnsafe =
+            case groupUnsafe of
+                "Teacher" ->
+                    Teacher
+
+                "Student" ->
+                    Student
+
+                str ->
+                    Debug.crash
+                        ("Cannot decode UserGroup value :" ++ str)
+    in
+        { userId = apiUser.userId
+        , firstName = apiUser.firstName
+        , lastName = apiUser.lastName
+        , email = apiUser.email
+        , group = toSafe apiUser.group
+        }
+
+
 type alias Web a =
     RD.RemoteData () a
 
 
-type alias StoryEdit =
+type alias StoryDraft =
     { title : String
     , sentences : Dict.Dict Int ItemEdit
     , freshIndex : Int
     }
+
+
+type StoryEditMode
+    = New
+    | Existing StoryId
 
 
 type alias ItemEdit =

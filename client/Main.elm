@@ -1,23 +1,19 @@
 module Main exposing (main)
 
-import Model exposing (Model, init)
-import Message exposing (Msg(..))
+import Model
+import Message
 import Update
-import View exposing (..)
+import View
 import Audio
-import Navigation as Nav
+import Navigation
 import Update.Extra.Infix exposing ((:>))
 
 
-main : Program Never Model Msg
+main : Program Never Model.Model Message.Msg
 main =
-    Nav.program UrlChange
-        { init = \loc -> init ! [] :> Update.urlChange loc
+    Navigation.program Message.UrlChange
+        { init = Update.init
         , update = Update.update
-        , subscriptions = always subs
-        , view = view
+        , subscriptions = always Update.subs
+        , view = View.view
         }
-
-
-subs =
-    Audio.onStateChange PlaybackStateChanged
