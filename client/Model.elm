@@ -1,32 +1,4 @@
-module Model
-    exposing
-        ( Model
-        , AppModel(..)
-        , NotReadyModel
-        , ReadyModel(..)
-        , LoginModel
-        , initLogin
-        , initLoginWithUser
-        , DashboardModel
-        , initDashboard
-        , StoryEditModel
-        , StoryEditMode(..)
-        , initStoryEdit
-        , StoryId
-        , ItemId
-        , User
-        , UserGroup(..)
-        , apiUserToUser
-        , StoryDraft
-        , Web
-        , PlaybackState(..)
-        , PlaybackItemState
-        , isLoaded
-        , isPaused
-        , isPlaying
-        , duration
-        , currentItemState
-        )
+module Model exposing (..)
 
 import Routing
 import Api
@@ -35,6 +7,7 @@ import RemoteData as RD
 import Time
 import Navigation as Nav
 import List.Zipper exposing (Zipper)
+import Bootstrap.Navbar as Navbar
 
 
 type alias Model =
@@ -56,7 +29,13 @@ type alias NotReadyModel =
     }
 
 
-type ReadyModel
+type alias ReadyModel =
+    { page : PageModel
+    , navState : Navbar.State
+    }
+
+
+type PageModel
     = LoginPage LoginModel
     | Dashboard DashboardModel
     | StoryEditPage StoryEditModel
@@ -87,13 +66,6 @@ initLoginWithUser user =
 type alias DashboardModel =
     { stories : Web (List ( StoryId, Api.Story ))
     , user : User
-    }
-
-
-initDashboard : User -> DashboardModel
-initDashboard user =
-    { stories = RD.NotAsked
-    , user = user
     }
 
 

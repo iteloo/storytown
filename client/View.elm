@@ -11,42 +11,100 @@ import Dict
 import RemoteData as RD
 import List.Nonempty as NList
 import Json.Encode as Enc
+import Bootstrap.Navbar as Navbar
+import Bootstrap.Grid as Grid
+import Bootstrap.Form as Form
+import Bootstrap.Form.Input as Input
+import Bootstrap.Button as Button
+import Bootstrap.ListGroup as ListGroup
 
 
 view : Model -> Html Msg
 view s =
     div []
-        [ Html.node "link"
-            [ property "rel" (Enc.string "stylesheet")
-            , property "type" (Enc.string "text/css")
-            , property "href" (Enc.string "style.css")
-            ]
-            []
-        , case s.app of
+        [ -- [note] must come after bootstrap css
+          --   Html.node "link"
+          --     [ property "rel" (Enc.string "stylesheet")
+          --     , property "type" (Enc.string "text/css")
+          --     , property "href" (Enc.string "style.css")
+          --     ]
+          --     []
+          case s.app of
             NotReady s ->
                 text "App loading..."
 
             Ready s ->
-                Html.map ReadyMsg <|
-                    case s of
-                        Model.LoginPage s ->
-                            Html.map LoginMsg loginView
-
-                        Dashboard s ->
-                            Html.map DashboardMsg (dashboardView s)
-
-                        StoryEditPage s ->
-                            Html.map StoryEditMsg (itemsView s)
+                Html.map ReadyMsg (appView s)
         , text (toString s)
+        ]
+
+
+appView : ReadyModel -> Html ReadyMsg
+appView s =
+    div []
+        [ menu s.navState
+        , Html.map PageMsg <|
+            case s.page of
+                LoginPage s ->
+                    Html.map LoginMsg loginView
+
+                Dashboard s ->
+                    Html.map DashboardMsg (dashboardView s)
+
+                StoryEditPage s ->
+                    Html.map StoryEditMsg (storyEditView s)
+        ]
+
+
+menu : Navbar.State -> Html ReadyMsg
+menu s =
+    Navbar.config NavbarMsg
+        |> Navbar.withAnimation
+        |> Navbar.container
+        |> Navbar.brand [ href "#" ] [ text "Storytown" ]
+        |> Navbar.items
+            [ Navbar.itemLink
+                [ href (Routing.makePath (Routing.Dashboard)) ]
+                [ text "Dashboard" ]
+            ]
+        |> Navbar.view s
+
+
+{-| [note] unused now
+-}
+breadcrumbView : Html ReadyMsg
+breadcrumbView =
+    nav [ class "breadcrumb" ]
+        [ a [ class "breadcrumb-item", href "#" ]
+            [ text "Home" ]
+        , a [ class "breadcrumb-item active" ]
+            [ text "Library" ]
         ]
 
 
 loginView : Html LoginMsg
 loginView =
-    div [] <|
-        [ input [ onInput UsernameInputChange ] []
-        , input [ onInput PasswordInputChange ] []
-        , button [ onClick LoginButton ] [ text "login" ]
+    Grid.container []
+        [ Form.form []
+            [ h2 [] [ text "Please sign in" ]
+            , Input.email
+                [ Input.attrs [ placeholder "email" ]
+                , Input.onInput UsernameInputChange
+                ]
+            , Input.password
+                [ Input.attrs [ placeholder "password" ]
+                , Input.onInput PasswordInputChange
+                ]
+            , br [] []
+            , Button.button
+                [ Button.primary
+                , Button.success
+                , Button.large
+                , Button.block
+                , Button.attrs [ onClick LoginButton ]
+                ]
+                [ text "login" ]
+            ]
         ]
 
 
@@ -65,15 +123,10 @@ dashboardView s =
 
 
 teacherDashboard s =
-    div []
-        [ text "Teacher Dashboard"
-        , br [] []
-        , a
-            [ href
-                (Routing.makePath
-                    (Routing.StoryNew)
-                )
-            ]
+    Grid.container []
+        [ h2 [] [ text "Teacher Dashboard" ]
+        , Button.linkButton
+            [ Button.attrs [ href (Routing.makePath (Routing.StoryNew)) ] ]
             [ text "New Story" ]
         , case s.stories of
             RD.NotAsked ->
@@ -86,12 +139,12 @@ teacherDashboard s =
                 text "Cannot load..."
 
             RD.Success stories ->
-                ul [] <| List.map storyItemView stories
+                ListGroup.ul <| List.map storyItemView stories
         ]
 
 
 storyItemView ( storyId, story ) =
-    li []
+    ListGroup.li []
         [ a
             [ href (Routing.makePath (Routing.StoryEdit storyId)) ]
             [ text story.title ]
@@ -102,9 +155,9 @@ storyItemView ( storyId, story ) =
 -- ITEM VIEW
 
 
-itemsView : StoryEditModel -> Html StoryEditMsg
-itemsView s =
-    div []
+storyEditView : StoryEditModel -> Html StoryEditMsg
+storyEditView s =
+    Grid.container []
         [ playbackView s
         , case s.story of
             RD.NotAsked ->

@@ -13,8 +13,10 @@ import Task
 import Time
 import Process
 import Navigation as Nav
+import Update.Extra exposing (addCmd)
 import Update.Extra.Infix exposing ((:>))
 import RemoteData as RD
+import Bootstrap.Navbar as Navbar
 
 
 init : Nav.Location -> ( Model, Cmd Msg )
@@ -29,8 +31,36 @@ init loc =
         ! [ Server.send (NotReadyMsg << UserReceived) Api.getApiUser ]
 
 
+initReady : PageModel -> ( ReadyModel, Cmd Msg )
+initReady page =
+    let
+        ( navState, navCmd ) =
+            Navbar.initialState (ReadyMsg << NavbarMsg)
+    in
+        { page = page
+        , navState = navState
+        }
+            ! [ navCmd ]
+
+
+initDashboard : User -> ( DashboardModel, Cmd Msg )
+initDashboard user =
+    { stories = RD.Loading
+    , user = user
+    }
+        ! [ Server.sendW
+                (ReadyMsg
+                    << PageMsg
+                    << DashboardMsg
+                    << StoriesReceived
+                )
+                Api.getApiStory
+          ]
+
+
 subs =
-    Audio.onStateChange (ReadyMsg << StoryEditMsg << PlaybackStateChanged)
+    Audio.onStateChange
+        (ReadyMsg << PageMsg << StoryEditMsg << PlaybackStateChanged)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -72,36 +102,45 @@ update message s =
                     badMsgState message s
 
                 Ready app ->
-                    let
-                        ( newS, cmd ) =
-                            updateReady msg app
-                    in
-                        { s | app = Ready newS } ! [ cmd ]
+                    updateReady msg app
+                        |> mapModel
+                            (\newS -> { s | app = Ready newS })
 
 
 updateReady : ReadyMsg -> ReadyModel -> ( ReadyModel, Cmd Msg )
 updateReady msg s =
+    case msg of
+        NavbarMsg state ->
+            { s | navState = state } ! []
+
+        PageMsg msg ->
+            updatePage msg s.page
+                |> mapModel (\newPage -> { s | page = newPage })
+
+
+updatePage : PageMsg -> PageModel -> ( PageModel, Cmd Msg )
+updatePage msg s =
     case ( msg, s ) of
         ( LoginMsg msg, LoginPage s ) ->
-            let
-                ( newS, cmd ) =
-                    updateLogin { toMsg = ReadyMsg << LoginMsg } msg s
-            in
-                LoginPage newS ! [ cmd ]
+            mapModel LoginPage <|
+                updateLogin
+                    { toMsg = ReadyMsg << PageMsg << LoginMsg }
+                    msg
+                    s
 
         ( DashboardMsg msg, Dashboard s ) ->
-            let
-                ( newS, cmd ) =
-                    updateDashboard { toMsg = ReadyMsg << DashboardMsg } msg s
-            in
-                Dashboard newS ! [ cmd ]
+            mapModel Dashboard <|
+                updateDashboard
+                    { toMsg = ReadyMsg << PageMsg << DashboardMsg }
+                    msg
+                    s
 
         ( StoryEditMsg msg, StoryEditPage s ) ->
-            let
-                ( newS, cmd ) =
-                    updateStoryEdit { toMsg = ReadyMsg << StoryEditMsg } msg s
-            in
-                StoryEditPage newS ! [ cmd ]
+            mapModel StoryEditPage <|
+                updateStoryEdit
+                    { toMsg = ReadyMsg << PageMsg << StoryEditMsg }
+                    msg
+                    s
 
         _ ->
             badMsgState msg s
@@ -372,7 +411,7 @@ startRecording itemid s =
     -- [todo] adds error handling
     { s | recordingId = Just itemid }
         ! [ Task.attempt
-                (ReadyMsg << StoryEditMsg << TestNativeStart)
+                (ReadyMsg << PageMsg << StoryEditMsg << TestNativeStart)
                 (MR.start ())
           ]
 
@@ -387,7 +426,8 @@ stopRecording s =
                             Debug.crash "audio file failed to be prepared"
 
                         Ok r ->
-                            (ReadyMsg << StoryEditMsg << FileReady) r
+                            (ReadyMsg << PageMsg << StoryEditMsg << FileReady)
+                                r
                 )
                 (MR.stop ())
           ]
@@ -423,11 +463,8 @@ urlChange loc s =
                     Debug.crash "Cannot parse path"
 
                 Just route ->
-                    let
-                        ( newApp, cmd ) =
-                            routeChange route s.app
-                    in
-                        { s | app = newApp } ! [ cmd ]
+                    routeChange route s.app
+                        |> mapModel (\newApp -> { s | app = newApp })
     in
         case s.app of
             NotReady nr ->
@@ -443,73 +480,75 @@ urlChange loc s =
 
 routeChange : Routing.Route -> AppModel -> ( AppModel, Cmd Msg )
 routeChange route app =
-    case route of
-        Routing.StoryNew ->
-            defaultLogin app <|
-                \user ->
-                    let
-                        s =
-                            initStoryEdit user New
-                    in
-                        StoryEditPage
-                            { s
-                                | story =
-                                    RD.succeed
-                                        { title = "Untitled"
-                                        , freshIndex = 0
-                                        , sentences = Dict.empty
-                                        }
-                                , mode = New
-                            }
-                            ! []
+    let
+        ( newPage, cmd ) =
+            case route of
+                Routing.StoryNew ->
+                    defaultLogin app <|
+                        \user ->
+                            let
+                                s =
+                                    initStoryEdit user New
+                            in
+                                StoryEditPage
+                                    { s
+                                        | story =
+                                            RD.succeed
+                                                { title = "Untitled"
+                                                , freshIndex = 0
+                                                , sentences = Dict.empty
+                                                }
+                                        , mode = New
+                                    }
+                                    ! []
 
-        Routing.StoryEdit storyid ->
-            defaultLogin app <|
-                \user ->
-                    let
-                        s =
-                            initStoryEdit user (Existing storyid)
-                    in
-                        StoryEditPage
-                            { s
-                                | story = RD.Loading
-                                , mode = Existing storyid
-                            }
-                            ! [ Server.sendW
-                                    (ReadyMsg << StoryEditMsg << StoryReceived)
-                                    (Api.getApiStoryById storyid)
-                              ]
+                Routing.StoryEdit storyid ->
+                    defaultLogin app <|
+                        \user ->
+                            let
+                                s =
+                                    initStoryEdit user (Existing storyid)
+                            in
+                                StoryEditPage
+                                    { s | story = RD.Loading }
+                                    ! [ Server.sendW
+                                            (ReadyMsg
+                                                << PageMsg
+                                                << StoryEditMsg
+                                                << StoryReceived
+                                            )
+                                            (Api.getApiStoryById storyid)
+                                      ]
 
-        Routing.Login ->
-            defaultLogin app <|
-                \user ->
-                    LoginPage (initLoginWithUser user) ! []
+                Routing.Login ->
+                    defaultLogin app <|
+                        \user -> LoginPage (initLoginWithUser user) ! []
 
-        Routing.Dashboard ->
-            defaultLogin app <|
-                \user ->
-                    Dashboard (initDashboard user)
-                        ! [ Server.sendW
-                                (ReadyMsg << DashboardMsg << StoriesReceived)
-                                Api.getApiStory
-                          ]
+                Routing.Dashboard ->
+                    defaultLogin app <|
+                        \user -> mapModel Dashboard (initDashboard user)
+    in
+        case app of
+            NotReady _ ->
+                initReady newPage
+                    |> mapModel Ready
+                    |> addCmd cmd
+
+            Ready app ->
+                Ready { app | page = newPage } ! [ cmd ]
 
 
 defaultLogin :
     AppModel
-    -> (User -> ( ReadyModel, Cmd Msg ))
-    -> ( AppModel, Cmd Msg )
-defaultLogin app newAppWithAuth =
+    -> (User -> ( PageModel, Cmd Msg ))
+    -> ( PageModel, Cmd Msg )
+defaultLogin app newPageWithAuth =
     case user app of
         Nothing ->
-            Ready (LoginPage initLogin) ! []
+            LoginPage initLogin ! []
 
         Just user ->
-            let
-                ( newS, cmd ) =
-                    newAppWithAuth user
-            in
-                Ready newS ! [ cmd ]
+            newPageWithAuth user
 
 
 user : AppModel -> Maybe User
@@ -519,7 +558,7 @@ user app =
             nr.user
 
         Ready app ->
-            case app of
+            case app.page of
                 LoginPage page ->
                     page.user
 
@@ -559,3 +598,8 @@ delay time msg =
     Process.sleep time
         |> Task.andThen (always <| Task.succeed msg)
         |> Task.perform identity
+
+
+mapModel : (model1 -> model2) -> ( model1, Cmd msg ) -> ( model2, Cmd msg )
+mapModel f ( s, cmd ) =
+    ( f s, cmd )

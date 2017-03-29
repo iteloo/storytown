@@ -63,7 +63,7 @@ handleHttpError tag tagE r =
             tag a
 
         Err e ->
-            case e of
+            case Debug.log "error" e of
                 Http.BadStatus resp ->
                     if resp.status.code == 401 then
                         UnauthorizedError

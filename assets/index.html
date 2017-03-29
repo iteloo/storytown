@@ -1,137 +1,150 @@
-<div id="main"></div>
-<script src="main.js"></script>
-<script src="BufferLoader.js"></script>
-<script>
-  var app = Elm.Main.fullscreen();
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+  </head>
+  <body>
 
-  var context = new AudioContext();
-  var buffer;
-  var timestamps;
-  var sources = [];
-  var lastOffsetStart;
-  var count;
+    <div id="main"></div>
+    <script src="main.js"></script>
+    <script src="BufferLoader.js"></script>
+    <script>
+      var app = Elm.Main.fullscreen();
 
-  app.ports.load.subscribe(iteminfo => {
-    let finishedLoading = bufferList => {
-      buffer = bufferList.reduce(appendBuffer);
-      timestamps = bufferList.reduce((ts, buf) => {
-        return ts.concat([ buf.duration + ts[ts.length-1] ])
-      },[0]);
-      timestamps = timestamps.slice(1).map((e,i) => {
-        return {
-          itemId: iteminfo[i][1] ,
-          start: timestamps.slice(0,-1)[i],
-          end: e
+      var context = new AudioContext();
+      var buffer;
+      var timestamps;
+      var sources = [];
+      var lastOffsetStart;
+      var count;
+
+      app.ports.load.subscribe(iteminfo => {
+        let finishedLoading = bufferList => {
+          buffer = bufferList.reduce(appendBuffer);
+          timestamps = bufferList.reduce((ts, buf) => {
+            return ts.concat([ buf.duration + ts[ts.length-1] ])
+          },[0]);
+          timestamps = timestamps.slice(1).map((e,i) => {
+            return {
+              itemId: iteminfo[i][1] ,
+              start: timestamps.slice(0,-1)[i],
+              end: e
+            }
+          });
+          app.ports.onStateChangeRaw.send({
+              ctor: "Stopped"
+            , count: count=0
+          });
+        };
+        let bufferLoader = new BufferLoader(
+          context
+          , iteminfo.map(e => e[0])
+          , finishedLoading
+        );
+        bufferLoader.load()
+      });
+
+      app.ports.play.subscribe(e => {
+        if (context.state == "suspended") {
+          context.resume();
+          app.ports.onStateChangeRaw.send({
+              ctor: "Playing"
+            , count: count
+            , offset: context.currentTime - lastOffsetStart
+            , timestamps: timestamps
+          })
+        } else {
+          createAndStartSource(0)
+          app.ports.onStateChangeRaw.send({
+              ctor: "Playing"
+            , count: count
+            , offset: context.currentTime - lastOffsetStart
+            , timestamps: timestamps
+          })
         }
-      });
-      app.ports.onStateChangeRaw.send({
-          ctor: "Stopped"
-        , count: count=0
-      });
-    };
-    let bufferLoader = new BufferLoader(
-      context
-      , iteminfo.map(e => e[0])
-      , finishedLoading
-    );
-    bufferLoader.load()
-  });
-
-  app.ports.play.subscribe(e => {
-    if (context.state == "suspended") {
-      context.resume();
-      app.ports.onStateChangeRaw.send({
-          ctor: "Playing"
-        , count: count
-        , offset: context.currentTime - lastOffsetStart
-        , timestamps: timestamps
       })
-    } else {
-      createAndStartSource(0)
-      app.ports.onStateChangeRaw.send({
-          ctor: "Playing"
-        , count: count
-        , offset: context.currentTime - lastOffsetStart
-        , timestamps: timestamps
-      })
-    }
-  })
 
-  app.ports.pause.subscribe(e => {
-    context.suspend();
-    app.ports.onStateChangeRaw.send({
-        ctor: "Paused"
-      , count: ++count
-      , offset: context.currentTime - lastOffsetStart
-      , timestamps: timestamps
-    })
-  })
-
-  app.ports.rewind.subscribe(e => {
-    let next_i = timestamps.findIndex(i =>
-      lastOffsetStart+i.end > context.currentTime-0.4
-    );
-    let t = next_i == -1 ?
-      timestamps[timestamps.length-1].start : timestamps[next_i].start;
-    jumpTo(t);
-  })
-
-  app.ports.fastforward.subscribe(e => {
-    let i = timestamps.findIndex(i =>
-      lastOffsetStart+i.start > context.currentTime
-    );
-    let t = i == -1 ?
-      timestamps[timestamps.length-1].end : timestamps[i].start;
-    jumpTo(t);
-  })
-
-  app.ports.jumpTo.subscribe(itemid => {
-    // [note] assumes only called when playing or paused
-    let offset = timestamps.find(i => i.itemId == itemid ).start;
-    jumpTo(offset)
-  })
-
-  function jumpTo(offset) {
-    for (var i in sources) { sources[i].stop(); }
-    createAndStartSource(offset);
-    // [note] assumes rewind isn't sent when stopped or loading
-    app.ports.onStateChangeRaw.send({
-        ctor: context.state == "suspended" ? "Paused" : "Playing"
-      , count: ++count
-      , offset: offset
-      , timestamps: timestamps
-    })
-  }
-
-  function createAndStartSource(offset) {
-    let source = context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(context.destination);
-    source.onended = () => {
-      sources.splice(sources.indexOf(source), 1);
-      if (sources.length == 0) {
+      app.ports.pause.subscribe(e => {
+        context.suspend();
         app.ports.onStateChangeRaw.send({
-            ctor: "Stopped"
+            ctor: "Paused"
           , count: ++count
+          , offset: context.currentTime - lastOffsetStart
+          , timestamps: timestamps
+        })
+      })
+
+      app.ports.rewind.subscribe(e => {
+        let next_i = timestamps.findIndex(i =>
+          lastOffsetStart+i.end > context.currentTime-0.4
+        );
+        let t = next_i == -1 ?
+          timestamps[timestamps.length-1].start : timestamps[next_i].start;
+        jumpTo(t);
+      })
+
+      app.ports.fastforward.subscribe(e => {
+        let i = timestamps.findIndex(i =>
+          lastOffsetStart+i.start > context.currentTime
+        );
+        let t = i == -1 ?
+          timestamps[timestamps.length-1].end : timestamps[i].start;
+        jumpTo(t);
+      })
+
+      app.ports.jumpTo.subscribe(itemid => {
+        // [note] assumes only called when playing or paused
+        let offset = timestamps.find(i => i.itemId == itemid ).start;
+        jumpTo(offset)
+      })
+
+      function jumpTo(offset) {
+        for (var i in sources) { sources[i].stop(); }
+        createAndStartSource(offset);
+        // [note] assumes rewind isn't sent when stopped or loading
+        app.ports.onStateChangeRaw.send({
+            ctor: context.state == "suspended" ? "Paused" : "Playing"
+          , count: ++count
+          , offset: offset
+          , timestamps: timestamps
         })
       }
-    };
-    sources.push(source);
-    lastOffsetStart = context.currentTime - offset;
-    source.start(context.currentTime, offset);
-  }
 
-  function appendBuffer(buffer1, buffer2) {
-    var numberOfChannels = Math.min(
-      buffer1.numberOfChannels, buffer2.numberOfChannels );
-    var tmp = context.createBuffer( numberOfChannels,
-      (buffer1.length + buffer2.length), buffer1.sampleRate );
-    for (var i=0; i<numberOfChannels; i++) {
-      var channel = tmp.getChannelData(i);
-      channel.set( buffer1.getChannelData(i), 0);
-      channel.set( buffer2.getChannelData(i), buffer1.length);
-    }
-    return tmp;
-  }
+      function createAndStartSource(offset) {
+        let source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(context.destination);
+        source.onended = () => {
+          sources.splice(sources.indexOf(source), 1);
+          if (sources.length == 0) {
+            app.ports.onStateChangeRaw.send({
+                ctor: "Stopped"
+              , count: ++count
+            })
+          }
+        };
+        sources.push(source);
+        lastOffsetStart = context.currentTime - offset;
+        source.start(context.currentTime, offset);
+      }
 
-</script>
+      function appendBuffer(buffer1, buffer2) {
+        var numberOfChannels = Math.min(
+          buffer1.numberOfChannels, buffer2.numberOfChannels );
+        var tmp = context.createBuffer( numberOfChannels,
+          (buffer1.length + buffer2.length), buffer1.sampleRate );
+        for (var i=0; i<numberOfChannels; i++) {
+          var channel = tmp.getChannelData(i);
+          channel.set( buffer1.getChannelData(i), 0);
+          channel.set( buffer2.getChannelData(i), buffer1.length);
+        }
+        return tmp;
+      }
+
+    </script>
+  </body>
+</html>

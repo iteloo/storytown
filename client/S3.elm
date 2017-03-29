@@ -11,7 +11,6 @@ import Message exposing (Msg(..))
 import Http
 import RemoteData as RD
 import MediaRecorder as MR
-import Debug
 
 
 send :

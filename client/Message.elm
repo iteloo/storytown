@@ -6,6 +6,7 @@ import MediaRecorder as MR
 import Navigation as Nav
 import RemoteData as RD
 import Http
+import Bootstrap.Navbar as Navbar
 
 
 type Msg
@@ -24,6 +25,11 @@ type NotReadyMsg
 
 
 type ReadyMsg
+    = NavbarMsg Navbar.State
+    | PageMsg PageMsg
+
+
+type PageMsg
     = LoginMsg LoginMsg
     | DashboardMsg DashboardMsg
     | StoryEditMsg StoryEditMsg

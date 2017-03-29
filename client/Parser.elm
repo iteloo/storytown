@@ -8,7 +8,7 @@ module Parser
 import Combine exposing (..)
 import Combine.Char exposing (..)
 import List.Nonempty as NList exposing (Nonempty, (:::))
-import Debug
+
 
 
 type alias TranslatedText =
