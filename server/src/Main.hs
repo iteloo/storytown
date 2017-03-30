@@ -38,11 +38,15 @@ main = do
           (hPutStrLn stderr ("listening on port " ++ show p ++ "..."))
           defaultSettings
   let tls = TLS.tlsSettings "ssl/certificate.pem" "ssl/key.pem"
+  let run = case env of
+          Development -> TLS.runTLS tls
+          Test        -> TLS.runTLS tls
+          Production  -> runSettings  -- [note] SSL termination on heroku proxy
   runStdoutLoggingT
     $ withPostgresqlPool (pgConnStr pgconf) (pgPoolSize pgconf)
     $ \pool -> liftIO $ do
         let cfg = Config pool env
-        TLS.runTLS tls settings . logger =<< startApp cfg
+        run settings . logger =<< startApp cfg
 
 newtype AppSettings = AppSettings {
   port :: Int
