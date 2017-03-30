@@ -13,7 +13,7 @@ packages:
   - amazonka-s3
   extra-dep: True
 - location:
-    git: git@github.com:iteloo/servant-auth.git
+    git: https://www.github.com/iteloo/servant-auth
     commit: 7887155d54c9f9ba8a5350962b1530b4296c69f3
   subdirs:
   - servant-auth-server
