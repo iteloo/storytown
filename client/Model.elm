@@ -8,6 +8,7 @@ import Time
 import Navigation as Nav
 import List.Zipper exposing (Zipper)
 import Bootstrap.Navbar as Navbar
+import Trans
 
 
 type alias Model =
@@ -149,7 +150,10 @@ type StoryEditMode
 
 
 type alias ItemEdit =
-    { text : String
+    { text :
+        String
+        -- [hack] [tmp]
+    , collapsable : Trans.Collapsable String Trans.Word
     , audioUrl : Maybe String
     }
 

@@ -1,19 +1,15 @@
 .table {
   display: table;
   border-collapse: collapse;
-  height: 13pt;
 }
 
 .row {
   display: table-row;
-  width: 1px;
 }
 
 .cell {
   display: table-cell;
-  line-height: 1;
-  text-align: left;
-  vertical-align: top;
+  text-align: center;
 }
 
 .cell .orig {
@@ -22,25 +18,59 @@
   white-space: nowrap;
 }
 
-.padding {
-  display: table-cell;
-  text-align: center;
+.side-padding {
   padding-left: 2pt;
   padding-right: 2pt;
-  padding-bottom: 5pt;
-  width: 1px;
+  text-align: center;
+}
+
+.padding {
+  border-top: 1.3px solid rgba(0, 127, 0, 0.4);
+  padding-bottom: 1.2pt;
+  padding-top: 1.2pt;
 }
 
 .trans {
-  border-top: 5px solid rgba(0, 127, 0, 0.4);
-  /* box-shadow: 0 7px rgba(0,127,0,0.4) inset; */
   color: rgba(0, 127, 0, .7);
 }
 
-textarea {
-  font-family: monaco, Consolas, "Lucida Console", monospace;
-  font-size: 12px;
-  white-space: pre-wrap;
-  height: 100%;
-  resize: none;
+.hoverarea.min {
+  border-top: none;
+  /*transition: max-height .2s ease;*/
+  max-height: 0pt;
+  overflow: hidden;
+}
+
+.hoverarea {
+  box-sizing: border-box;
+  /*overflow: hidden;*/
+  max-height: 0pt; /* must be same as */
+  /*transition: max-height .2s ease;*/
+}
+
+.hoverarea.hasexpand:hover {
+  transform: translateY(-9pt); /* must be same as .expand.height */
+}
+
+.hoverarea:hover .padding {
+  background: rgba(0, 127, 0, .1);
+}
+
+.hoverarea .expand , .hoverarea .collapse {
+  display: none;
+}
+
+.hoverarea:hover .expand, .hoverarea:hover .collapse {
+  display: block;
+}
+
+.expand , .collapse {
+  background: rgba(0, 127, 127, .05);
+  height: 9pt; /*must be same as .hoverarea.hasexpand:hover.transform*/
+  font-size: 8pt;
+  line-height: 1;
+}
+
+.expand:hover , .collapse:hover {
+  background: rgba(0, 127, 127, .2);
 }

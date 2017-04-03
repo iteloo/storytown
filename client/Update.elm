@@ -8,6 +8,7 @@ import S3
 import Api
 import Audio
 import MediaRecorder as MR
+import TransView
 import Dict
 import Task
 import Time
@@ -231,7 +232,8 @@ updateStoryEdit { toMsg } message s =
                     { sty
                         | sentences =
                             Dict.insert sty.freshIndex
-                                (Api.Item "" Nothing)
+                                -- [ hack ] tmp
+                                (ItemEdit "" TransView.test Nothing)
                                 sty.sentences
                         , freshIndex = sty.freshIndex + 1
                     }
@@ -260,7 +262,15 @@ updateStoryEdit { toMsg } message s =
                             { title = sty.title
                             , sentences =
                                 Dict.fromList <|
-                                    List.indexedMap (,) sty.sentences
+                                    List.indexedMap (,) <|
+                                        List.map
+                                            (\{ text, audioUrl } ->
+                                                { text = text
+                                                , collapsable = TransView.test
+                                                , audioUrl = audioUrl
+                                                }
+                                            )
+                                            sty.sentences
                             , freshIndex = List.length sty.sentences
                             }
                         )
@@ -402,6 +412,21 @@ updateStoryEdit { toMsg } message s =
         TestNativeStart runit ->
             s ! Debug.log "in TestNativeStart" []
 
+        CollapsableChange new ->
+            updateSentences
+                (Dict.update
+                    0
+                    (Maybe.map
+                        (\{ text, collapsable, audioUrl } ->
+                            { text = text
+                            , collapsable = new
+                            , audioUrl = audioUrl
+                            }
+                        )
+                    )
+                )
+                s
+
 
 
 -- AUDIO
@@ -440,7 +465,13 @@ stopRecording s =
 storyFromDraft : StoryDraft -> Api.Story
 storyFromDraft draft =
     { title = draft.title
-    , sentences = Dict.values draft.sentences
+    , sentences =
+        List.map
+            (\{ text, collapsable, audioUrl } ->
+                { text = text, audioUrl = audioUrl }
+            )
+        <|
+            Dict.values draft.sentences
     }
 
 

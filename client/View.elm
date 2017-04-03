@@ -2,8 +2,8 @@ module View exposing (view)
 
 import Model exposing (..)
 import Message exposing (..)
-import Parser
 import Routing
+import TransView
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -17,19 +17,20 @@ import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Button as Button
 import Bootstrap.ListGroup as ListGroup
+import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 
 
 view : Model -> Html Msg
 view s =
     div []
         [ -- [note] must come after bootstrap css
-          --   Html.node "link"
-          --     [ property "rel" (Enc.string "stylesheet")
-          --     , property "type" (Enc.string "text/css")
-          --     , property "href" (Enc.string "style.css")
-          --     ]
-          --     []
-          case s.app of
+          Html.node "link"
+            [ property "rel" (Enc.string "stylesheet")
+            , property "type" (Enc.string "text/css")
+            , property "href" (Enc.string "style.css")
+            ]
+            []
+        , case s.app of
             NotReady s ->
                 text "App loading..."
 
@@ -221,14 +222,13 @@ itemView { playbackState, recordingId } index item =
                     [ let
                         txt =
                             a
-                                ([]
-                                    ++ if
-                                        isPaused playbackState
-                                            || isPlaying playbackState
-                                       then
-                                        [ onClick (TextClicked index) ]
-                                       else
-                                        []
+                                (if
+                                    isPaused playbackState
+                                        || isPlaying playbackState
+                                 then
+                                    [ onClick (TextClicked index) ]
+                                 else
+                                    []
                                 )
                                 [ textarea
                                     [ placeholder "Write something..."
@@ -247,42 +247,16 @@ itemView { playbackState, recordingId } index item =
                         else
                             txt
                     ]
-                , case Parser.parseTranslatedText item.text of
-                    Ok r ->
-                        transView r
-
-                    Err e ->
-                        text e
+                  -- , case Parser.parseTranslatedText item.text of
+                  --     Ok r ->
+                  --         transView r
+                  --
+                  --     Err e ->
+                  --         text e
+                , TransView.view item.collapsable
                 ]
             ]
         ]
-
-
-transView trans =
-    div [ class "table" ]
-        [ div [] <|
-            List.map transBlockView trans
-        ]
-
-
-transBlockView : Parser.TranslatedBlock -> Html StoryEditMsg
-transBlockView block =
-    case block of
-        Parser.L2Word w ->
-            div [ class "cell orig" ] [ text w ]
-
-        Parser.TranslatedBlock bs trans ->
-            div [ class "cell" ]
-                [ div [ class "row" ]
-                    [ div [] <|
-                        NList.toList <|
-                            NList.map transBlockView bs
-                    ]
-                , div [ class "padding" ]
-                    [ div [ class "trans" ]
-                        [ text trans ]
-                    ]
-                ]
 
 
 

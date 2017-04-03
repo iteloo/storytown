@@ -5,6 +5,7 @@ import Api
 import MediaRecorder as MR
 import Navigation as Nav
 import RemoteData as RD
+import Trans
 import Http
 import Bootstrap.Navbar as Navbar
 
@@ -77,3 +78,4 @@ type StoryEditMsg
     | NextSentence Int
       -- TEST
     | TestNativeStart (Result MR.Error ())
+    | CollapsableChange (Trans.Collapsable String Trans.Word)
