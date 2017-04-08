@@ -1,3 +1,8 @@
+all: ../assets/style.css ../assets/main.js
+
+../assets/style.css: Stylesheets.elm
+	elm-css Stylesheets.elm
+
 ../assets/main.js: Api.elm Main.elm .
 	elm make Main.elm --output ../assets/main.js
 

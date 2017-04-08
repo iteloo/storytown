@@ -2,6 +2,7 @@ module View exposing (view)
 
 import Model exposing (..)
 import Message exposing (..)
+import MyCss exposing (CssClass(..))
 import Routing
 import TransView
 import Html exposing (..)
@@ -18,6 +19,11 @@ import Bootstrap.Form.Input as Input
 import Bootstrap.Button as Button
 import Bootstrap.ListGroup as ListGroup
 import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
+import Html.CssHelpers
+
+
+{ id, class, classList } =
+    Html.CssHelpers.withNamespace MyCss.storytown
 
 
 view : Model -> Html Msg
@@ -36,7 +42,6 @@ view s =
 
             Ready s ->
                 Html.map ReadyMsg (appView s)
-        , text (toString s)
         ]
 
 
@@ -54,6 +59,8 @@ appView s =
 
                 StoryEditPage s ->
                     Html.map StoryEditMsg (storyEditView s)
+        , footer [ class [ Footer ] ]
+            [ div [ Html.Attributes.class "container" ] [ text (toString s) ] ]
         ]
 
 
@@ -71,16 +78,17 @@ menu s =
         |> Navbar.view s
 
 
-{-| [note] unused now
--}
-breadcrumbView : Html ReadyMsg
-breadcrumbView =
-    nav [ class "breadcrumb" ]
-        [ a [ class "breadcrumb-item", href "#" ]
-            [ text "Home" ]
-        , a [ class "breadcrumb-item active" ]
-            [ text "Library" ]
-        ]
+
+-- {-| [note] unused now
+-- -}
+-- breadcrumbView : Html ReadyMsg
+-- breadcrumbView =
+--     nav [ class "breadcrumb" ]
+--         [ a [ class "breadcrumb-item", href "#" ]
+--             [ text "Home" ]
+--         , a [ class "breadcrumb-item active" ]
+--             [ text "Library" ]
+--         ]
 
 
 loginView : Html LoginMsg
@@ -171,7 +179,7 @@ storyEditView s =
                 text "Cannot load..."
 
             RD.Success story ->
-                div [ class "table" ] <|
+                div [ class [ Table ] ] <|
                     Dict.values <|
                         Dict.map
                             (\index item -> itemView s index item)
@@ -187,12 +195,12 @@ storyEditView s =
 
 
 itemView { playbackState, recordingId } index item =
-    div [ class "row" ]
-        [ div [ class "cell" ]
+    div [ class [ Row ] ]
+        [ div [ class [ Cell ] ]
             [ button [ onClick (DeleteButton index) ] [ text "x" ] ]
-        , div [ class "cell" ]
-            [ div [ class "table" ]
-                [ div [ class "cell" ]
+        , div [ class [ Cell ] ]
+            [ div [ class [ Table ] ]
+                [ div [ class [ Cell ] ]
                     [ case recordingId of
                         Nothing ->
                             button [ onClick (RecordButton index) ]
@@ -217,8 +225,8 @@ itemView { playbackState, recordingId } index item =
                             ]
                             []
                 ]
-            , div [ class "table" ]
-                [ div [ class "cell" ]
+            , div [ class [ Table ] ]
+                [ div [ class [ Cell ] ]
                     [ let
                         txt =
                             a

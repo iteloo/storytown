@@ -1,6 +1,7 @@
 module TransView exposing (..)
 
 import Message exposing (..)
+import MyCss exposing (CssClass(..))
 import Trans exposing (..)
 import Parser exposing (..)
 import Either exposing (Either(..))
@@ -10,6 +11,11 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 import Bootstrap.Button as Button
+import Html.CssHelpers
+
+
+{ id, class, classList } =
+    Html.CssHelpers.withNamespace MyCss.storytown
 
 
 initViewCollapsable : Collapsable String Word -> Collapsable ( String, Maybe (CursorZipper String Word) ) Word
@@ -42,7 +48,7 @@ initViewCollapsable =
 
 view : Collapsable String Word -> Html StoryEditMsg
 view =
-    initViewCollapsable >> collapsableView >> (\v -> div [ class "table" ] [ v ])
+    initViewCollapsable >> collapsableView >> (\v -> div [ class [ Table ] ] [ v ])
 
 
 collapsableView :
@@ -53,7 +59,7 @@ collapsableView collapsable =
         addMin z =
             case z of
                 Nothing ->
-                    (++) "min "
+                    (::) Min
 
                 Just _ ->
                     identity
@@ -64,7 +70,7 @@ collapsableView collapsable =
                     identity
 
                 Just _ ->
-                    (++) "hasexpand "
+                    (::) HasExpand
 
         addExpand z =
             case z |> Maybe.andThen Trans.expand of
@@ -74,7 +80,7 @@ collapsableView collapsable =
                 Just z ->
                     (::)
                         (div
-                            [ class "expand"
+                            [ class [ Expand ]
                             , onClick <|
                                 CollapsableChange <|
                                     underlyingCollapsable z
@@ -90,7 +96,7 @@ collapsableView collapsable =
                 Just z ->
                     flip (++)
                         [ div
-                            [ class "collapse"
+                            [ class [ Collapse ]
                             , onClick <|
                                 CollapsableChange <|
                                     underlyingCollapsable z
@@ -103,20 +109,20 @@ collapsableView collapsable =
             -> List (Html StoryEditMsg)
             -> Html StoryEditMsg
         genericBlockView ( tr, z ) childViews =
-            div [ class "cell" ]
-                [ div [ class "row" ]
+            div [ class [ Cell ] ]
+                [ div [ class [ Row ] ]
                     [ div [] childViews ]
-                , div [ class "side-padding" ]
+                , div [ class [ SidePadding ] ]
                     [ div
                         [ class <|
                             addHasExpand z <|
-                                addMin z "hoverarea"
+                                addMin z [ Hoverarea ]
                         ]
                       <|
                         addCollapse z <|
                             addExpand z <|
-                                [ div [ class "padding" ]
-                                    [ div [ class "trans" ]
+                                [ div [ class [ Padding ] ]
+                                    [ div [ class [ Trans ] ]
                                         [ text tr ]
                                     ]
                                 ]
@@ -124,7 +130,7 @@ collapsableView collapsable =
                 ]
 
         wordView w =
-            span [ class "cell orig" ] [ text w ]
+            span [ class [ Cell, Orig ] ] [ text w ]
     in
         case collapsable of
             LoneWord w ->

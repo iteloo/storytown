@@ -7,7 +7,7 @@ build: client-build server-build
 install: client-build server-install
 
 install-and-start:
-	rm -rf assets/main.js && make install && heroku local
+	rm -rf assets/main.js assets/style.css && make install && heroku local
 
 client-setup:
 	(cd client ; elm package install -y)
