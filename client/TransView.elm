@@ -1,4 +1,4 @@
-module TransView exposing (..)
+module TransView exposing (view, test)
 
 import Message exposing (..)
 import MyCss exposing (CssClass(..))
@@ -18,7 +18,16 @@ import Html.CssHelpers
     Html.CssHelpers.withNamespace MyCss.storytown
 
 
-initViewCollapsable : Collapsable String Word -> Collapsable ( String, Maybe (CursorZipper String Word) ) Word
+view : Collapsable String Word -> Html StoryEditMsg
+view collapsable =
+    div [ class [ Table ] ]
+        [ collapsableView (initViewCollapsable collapsable)
+        ]
+
+
+initViewCollapsable :
+    Collapsable String Word
+    -> Collapsable ( String, Maybe (CursorZipper String Word) ) Word
 initViewCollapsable =
     let
         register :
@@ -46,129 +55,129 @@ initViewCollapsable =
             >> Either.fromEither LoneWord Block
 
 
-view : Collapsable String Word -> Html StoryEditMsg
-view =
-    initViewCollapsable >> collapsableView >> (\v -> div [ class [ Table ] ] [ v ])
-
-
 collapsableView :
     Collapsable ( String, Maybe (CursorZipper String Word) ) Word
     -> Html StoryEditMsg
 collapsableView collapsable =
-    let
-        addMin z =
-            case z of
-                Nothing ->
-                    (::) Min
+    case collapsable of
+        LoneWord w ->
+            wordView w
 
-                Just _ ->
-                    identity
+        Block block ->
+            let
+                blockView block =
+                    case block of
+                        ExpandedBlock trz bs ->
+                            genericBlockView trz <|
+                                List.map collapsableView <|
+                                    AtLeastOneOf.toList <|
+                                        AtLeastOneOf.map
+                                            Block
+                                            LoneWord
+                                            bs
 
-        addHasExpand z =
-            case z |> Maybe.andThen Trans.expand of
-                Nothing ->
-                    identity
+                        CursorBlock cblock ->
+                            let
+                                cursorBlockView cblock =
+                                    case cblock of
+                                        TerminalBlock trz ws ->
+                                            genericBlockView trz <|
+                                                List.map wordView <|
+                                                    Nonempty.toList ws
 
-                Just _ ->
-                    (::) HasExpand
+                                        CollapsedBlock trz bs ->
+                                            genericBlockView trz <|
+                                                AtLeastOneOf.toList <|
+                                                    AtLeastOneOf.map
+                                                        cursorBlockView
+                                                        wordView
+                                                        bs
+                            in
+                                cursorBlockView cblock
+            in
+                blockView block
 
-        addExpand z =
-            case z |> Maybe.andThen Trans.expand of
-                Nothing ->
-                    identity
 
-                Just z ->
-                    (::)
-                        (div
-                            [ class [ Expand ]
-                            , onClick <|
-                                CollapsableChange <|
-                                    underlyingCollapsable z
-                            ]
-                            [ text "v" ]
-                        )
-
-        addCollapse z =
-            case z |> Maybe.andThen Trans.collapse of
-                Nothing ->
-                    identity
-
-                Just z ->
-                    flip (++)
-                        [ div
-                            [ class [ Collapse ]
-                            , onClick <|
-                                CollapsableChange <|
-                                    underlyingCollapsable z
-                            ]
-                            [ text "^" ]
-                        ]
-
-        genericBlockView :
-            ( String, Maybe (CursorZipper String Word) )
-            -> List (Html StoryEditMsg)
-            -> Html StoryEditMsg
-        genericBlockView ( tr, z ) childViews =
-            div [ class [ Cell ] ]
-                [ div [ class [ Row ] ]
-                    [ div [] childViews ]
-                , div [ class [ SidePadding ] ]
-                    [ div
-                        [ class <|
-                            addHasExpand z <|
-                                addMin z [ Hoverarea ]
-                        ]
-                      <|
-                        addCollapse z <|
-                            addExpand z <|
-                                [ div [ class [ Padding ] ]
-                                    [ div [ class [ Trans ] ]
-                                        [ text tr ]
-                                    ]
-                                ]
-                    ]
+genericBlockView :
+    ( String, Maybe (CursorZipper String Word) )
+    -> List (Html StoryEditMsg)
+    -> Html StoryEditMsg
+genericBlockView ( tr, z ) childViews =
+    div [ class [ Cell ] ]
+        [ div [ class [ Row ] ]
+            [ div [] childViews ]
+        , div [ class [ SidePadding ] ]
+            [ div
+                [ class <|
+                    addHasExpand z <|
+                        addMin z [ Hoverarea ]
                 ]
+              <|
+                addCollapse z <|
+                    addExpand z <|
+                        [ div [ class [ Padding ] ]
+                            [ div [ class [ Trans ] ]
+                                [ text tr ]
+                            ]
+                        ]
+            ]
+        ]
 
-        wordView w =
-            span [ class [ Cell, Orig ] ] [ text w ]
-    in
-        case collapsable of
-            LoneWord w ->
-                wordView w
 
-            Block block ->
-                let
-                    blockView block =
-                        case block of
-                            ExpandedBlock trz bs ->
-                                genericBlockView trz <|
-                                    List.map collapsableView <|
-                                        AtLeastOneOf.toList <|
-                                            AtLeastOneOf.map
-                                                Block
-                                                LoneWord
-                                                bs
+wordView w =
+    span [ class [ Cell, Orig ] ] [ text (w ++ " ") ]
 
-                            CursorBlock cblock ->
-                                let
-                                    cursorBlockView cblock =
-                                        case cblock of
-                                            TerminalBlock trz ws ->
-                                                genericBlockView trz <|
-                                                    List.map wordView <|
-                                                        Nonempty.toList ws
 
-                                            CollapsedBlock trz bs ->
-                                                genericBlockView trz <|
-                                                    AtLeastOneOf.toList <|
-                                                        AtLeastOneOf.map
-                                                            cursorBlockView
-                                                            wordView
-                                                            bs
-                                in
-                                    cursorBlockView cblock
-                in
-                    blockView block
+addMin z =
+    case z of
+        Nothing ->
+            (::) Min
+
+        Just _ ->
+            identity
+
+
+addHasExpand z =
+    case z |> Maybe.andThen Trans.expand of
+        Nothing ->
+            identity
+
+        Just _ ->
+            (::) HasExpand
+
+
+addExpand z =
+    case z |> Maybe.andThen Trans.expand of
+        Nothing ->
+            identity
+
+        Just z ->
+            (::)
+                (div
+                    [ class [ Expand ]
+                    , onClick <|
+                        CollapsableChange <|
+                            underlyingCollapsable z
+                    ]
+                    [ text "v" ]
+                )
+
+
+addCollapse z =
+    case z |> Maybe.andThen Trans.collapse of
+        Nothing ->
+            identity
+
+        Just z ->
+            flip (++)
+                [ div
+                    [ class [ Collapse ]
+                    , onClick <|
+                        CollapsableChange <|
+                            underlyingCollapsable z
+                    ]
+                    [ text "^" ]
+                ]
 
 
 

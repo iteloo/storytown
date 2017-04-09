@@ -5,6 +5,7 @@ import Message
 import Update
 import View
 import Audio
+import Overflow
 import Navigation
 import Update.Extra.Infix exposing ((:>))
 
@@ -14,6 +15,6 @@ main =
     Navigation.program Message.UrlChange
         { init = Update.init
         , update = Update.update
-        , subscriptions = always Update.subs
+        , subscriptions = Update.subs
         , view = View.view
         }

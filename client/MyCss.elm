@@ -1,7 +1,7 @@
 module MyCss exposing (..)
 
 import Css exposing (..)
-import Css.Elements exposing (html, body, li)
+import Css.Elements exposing (html, body)
 import Css.Namespace exposing (namespace)
 
 
@@ -70,9 +70,8 @@ css =
                 [ display tableCell
                 , textAlign center
                 , withClass Orig
-                    [ padding (em 0.08)
-                    , fontSize (pt 36)
-                    , whiteSpace noWrap
+                    [ fontSize (pt 36)
+                    , property "white-space" "pre"
                     ]
                 ]
             , class SidePadding

@@ -9,6 +9,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Dict
+import Regex exposing (Match)
 import RemoteData as RD
 import List.Nonempty as NList
 import Json.Encode as Enc
@@ -263,8 +264,19 @@ itemView { playbackState, recordingId } index item =
                   --         text e
                 , TransView.view item.collapsable
                 ]
+            , div [ Html.Attributes.id "testDiv" ] <|
+                List.map
+                    (span [] << List.singleton << text << .match)
+                <|
+                    Regex.find Regex.All
+                        (Regex.regex "\\w+\\s?|[^\\w\\s]\\s?")
+                        loremIpsum
             ]
         ]
+
+
+loremIpsum =
+    "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum"
 
 
 

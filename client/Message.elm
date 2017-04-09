@@ -6,7 +6,9 @@ import MediaRecorder as MR
 import Navigation as Nav
 import RemoteData as RD
 import Trans
+import Overflow
 import Http
+import Time
 import Bootstrap.Navbar as Navbar
 
 
@@ -78,4 +80,7 @@ type StoryEditMsg
     | NextSentence Int
       -- TEST
     | TestNativeStart (Result MR.Error ())
+      -- LAYOUT
     | CollapsableChange (Trans.Collapsable String Trans.Word)
+    | AnimationFrame Time.Time
+    | LineWrapMeasured Overflow.Measurement

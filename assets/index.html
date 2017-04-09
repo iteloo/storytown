@@ -12,8 +12,33 @@
     <div id="main"></div>
     <script src="main.js"></script>
     <script src="BufferLoader.js"></script>
+    <script src="https://code.jquery.com/jquery-1.8.3.min.js"
+        integrity="sha256-YcbK69I5IXQftf/mYD8WY0/KmEDCv1asggHpJk1trM8="
+        crossorigin="anonymous"></script>
     <script>
       var app = Elm.Main.fullscreen();
+
+      /* OVERFLOW */
+      app.ports.measureLineWrap.subscribe(id => {
+        
+        /* [note] assumes input is a node with spans as children;
+                  the children should already have the necessary spaces
+                  included
+        */
+        var $el = $('#'+id)
+        var result = $el.find('span').map(function() {
+          return {
+            top: $(this).position().top
+          , width: $(this).width()
+          }
+        }).toArray();
+        if (result != undefined) {
+          app.ports.lineWrapMeasured.send(result)
+        }
+      });
+
+
+      /* PLAYBACK */
 
       var context = new AudioContext();
       var buffer;

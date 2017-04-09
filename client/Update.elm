@@ -9,6 +9,7 @@ import Api
 import Audio
 import MediaRecorder as MR
 import TransView
+import Overflow
 import Dict
 import Task
 import Time
@@ -18,6 +19,7 @@ import Update.Extra exposing (addCmd)
 import Update.Extra.Infix exposing ((:>))
 import RemoteData as RD
 import Bootstrap.Navbar as Navbar
+import AnimationFrame
 
 
 init : Nav.Location -> ( Model, Cmd Msg )
@@ -59,9 +61,34 @@ initDashboard user =
           ]
 
 
-subs =
-    Audio.onStateChange
-        (ReadyMsg << PageMsg << StoryEditMsg << PlaybackStateChanged)
+subs s =
+    Sub.batch <|
+        [ Audio.onStateChange
+            (ReadyMsg << PageMsg << StoryEditMsg << PlaybackStateChanged)
+        ]
+            ++ case s.app of
+                Ready rm ->
+                    case rm.page of
+                        StoryEditPage _ ->
+                            [ AnimationFrame.times
+                                (ReadyMsg
+                                    << PageMsg
+                                    << StoryEditMsg
+                                    << AnimationFrame
+                                )
+                            , Overflow.lineWrapMeasured
+                                (ReadyMsg
+                                    << PageMsg
+                                    << StoryEditMsg
+                                    << LineWrapMeasured
+                                )
+                            ]
+
+                        _ ->
+                            []
+
+                _ ->
+                    []
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -412,6 +439,7 @@ updateStoryEdit { toMsg } message s =
         TestNativeStart runit ->
             s ! Debug.log "in TestNativeStart" []
 
+        -- LAYOUT
         CollapsableChange new ->
             updateSentences
                 (Dict.update
@@ -426,6 +454,30 @@ updateStoryEdit { toMsg } message s =
                     )
                 )
                 s
+
+        AnimationFrame _ ->
+            s ! [ Overflow.measureLineWrap "testDiv" ]
+
+        LineWrapMeasured measurement ->
+            s
+                ! Debug.log
+                    (toString <|
+                        List.foldr
+                            (\sp lines ->
+                                case lines of
+                                    [] ->
+                                        [ ( [ sp.width ], sp.top ) ]
+
+                                    ( sps, top ) :: rest ->
+                                        if sp.top == top then
+                                            ( sp.width :: sps, top ) :: rest
+                                        else
+                                            ( [ sp.width ], sp.top ) :: lines
+                            )
+                            []
+                            measurement
+                    )
+                    []
 
 
 
@@ -549,6 +601,7 @@ routeChange route app =
                                                 << StoryReceived
                                             )
                                             (Api.getApiStoryById storyid)
+                                      , Overflow.checkOverflow "testId"
                                       ]
 
                 Routing.Login ->
