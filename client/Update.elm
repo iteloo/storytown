@@ -8,7 +8,8 @@ import S3
 import Api
 import Audio
 import MediaRecorder as MR
-import TransView
+import Trans
+import Parser
 import Overflow
 import Helper
 import Dict
@@ -261,6 +262,17 @@ updateStoryPage { toMsg } message s =
                             |> Maybe.map Audio.load
                             |> Helper.maybeToList
                           )
+
+                itemToSentence { text, audioUrl } =
+                    { collapsable =
+                        case Parser.parseTranslatedText text of
+                            Ok r ->
+                                Trans.fullyCollapsed r
+
+                            Err e ->
+                                Debug.crash e
+                    , audioUrl = audioUrl
+                    }
             in
                 { s
                     | story =
@@ -271,13 +283,7 @@ updateStoryPage { toMsg } message s =
                                     Dict.fromList <|
                                         List.indexedMap (,) <|
                                             List.map
-                                                (\{ text, audioUrl } ->
-                                                    { -- [tmp] bogus value
-                                                      collapsable =
-                                                        TransView.test
-                                                    , audioUrl = audioUrl
-                                                    }
-                                                )
+                                                itemToSentence
                                                 sty.sentences
                                 }
                             )
@@ -406,7 +412,6 @@ updateStoryEdit { toMsg } message s =
                     { sty
                         | sentences =
                             Dict.insert sty.freshIndex
-                                -- [ hack ] tmp
                                 (ItemEdit "" Nothing)
                                 sty.sentences
                         , freshIndex = sty.freshIndex + 1

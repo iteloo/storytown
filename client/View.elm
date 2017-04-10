@@ -325,7 +325,7 @@ itemEditView { recordingId } index item =
                 , div [ class [ Table ] ]
                     [ case Parser.parseTranslatedText item.text of
                         Ok r ->
-                            div [] <| List.map transView r
+                            transView r
 
                         Err e ->
                             text e

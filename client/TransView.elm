@@ -1,4 +1,4 @@
-module TransView exposing (view, test)
+module TransView exposing (view)
 
 import Message exposing (..)
 import MyCss exposing (CssClass(..))
@@ -208,33 +208,3 @@ addCollapse z =
                     ]
                     [ text "^" ]
                 ]
-
-
-
--- TEST
-
-
-testTrans =
-    TranslatedBlock
-        (Nonempty
-            (TranslatedBlock
-                (Nonempty (L2Word "what!") [])
-                "什麼！"
-            )
-            [ (TranslatedBlock
-                (Nonempty
-                    (L2Word "he")
-                    [ TranslatedBlock
-                        (Nonempty (L2Word "is") [ L2Word "alive" ])
-                        "活著"
-                    ]
-                )
-                "他活著"
-              )
-            ]
-        )
-        "什麼！他還活著！？"
-
-
-test =
-    testTrans |> fullyCollapsed

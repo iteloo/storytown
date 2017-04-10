@@ -72,29 +72,12 @@ getNodeCursorBlock block =
 
 
 updateNodeCursorBlock f block =
-    let
-        -- [hack]
-        updateNodeTop f (CursorZipper b ctx) =
-            let
-                go ctx =
-                    case ctx of
-                        Down a before after Top ->
-                            Down (f a) before after Top
+    case block of
+        TerminalBlock a bs ->
+            TerminalBlock (f a) bs
 
-                        Down a before after parctx ->
-                            Down a before after (go parctx)
-
-                        Top ->
-                            Top
-            in
-                CursorZipper b (go ctx)
-    in
-        case block of
-            TerminalBlock a bs ->
-                TerminalBlock (f a) bs
-
-            CollapsedBlock a bs ->
-                CollapsedBlock (f a) bs
+        CollapsedBlock a bs ->
+            CollapsedBlock (f a) bs
 
 
 mapCursorBlock : (a -> c) -> (b -> d) -> CursorBlock a b -> CursorBlock c d

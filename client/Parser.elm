@@ -10,7 +10,6 @@ import Combine.Char exposing (..)
 import List.Nonempty as NList exposing (Nonempty, (:::))
 
 
-
 type alias TranslatedText =
     List TranslatedBlock
 
@@ -20,6 +19,7 @@ type TranslatedBlock
     | TranslatedBlock (Nonempty TranslatedBlock) String
 
 
+parseTranslatedText : String -> Result String TranslatedBlock
 parseTranslatedText input =
     case runParser translatedText (NList.fromElement 0) input of
         Ok ( _, _, result ) ->
@@ -126,6 +126,8 @@ expr =
                 <|> (UntranslatedWord <$> line)
 
 
+{-| [unused]
+-}
 exprs : Parser ParseState (List Expr)
 exprs =
     manyTill expr end
@@ -136,11 +138,12 @@ notEol =
 
 
 line =
-    map String.fromList (manyTill anyChar eol)
+    -- [todo] can be made more efficient
+    map String.fromList (manyTill anyChar eol <|> manyTill anyChar end)
 
 
 translatedText =
-    map (List.map translatedBlockFromExpr) exprs
+    map translatedBlockFromExpr expr <* end
 
 
 
