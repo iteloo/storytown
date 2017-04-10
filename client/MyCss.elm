@@ -11,6 +11,7 @@ storytown =
 
 type CssClass
     = Footer
+    | Flex
     | Table
     | Row
     | Cell
@@ -59,6 +60,9 @@ css =
                 , width (pct 100)
                 , height footerHeight
                 , backgroundColor (hex "#f5f5f5")
+                ]
+            , class Flex
+                [ property "display" "flex"
                 ]
             , class Table
                 [ display table

@@ -10,6 +10,7 @@ import Audio
 import MediaRecorder as MR
 import TransView
 import Overflow
+import Helper
 import Dict
 import Task
 import Time
@@ -64,22 +65,22 @@ initDashboard user =
 subs s =
     Sub.batch <|
         [ Audio.onStateChange
-            (ReadyMsg << PageMsg << StoryEditMsg << PlaybackStateChanged)
+            (ReadyMsg << PageMsg << StoryMsg << PlaybackStateChanged)
         ]
             ++ case s.app of
                 Ready rm ->
                     case rm.page of
-                        StoryEditPage _ ->
+                        StoryPage _ ->
                             [ AnimationFrame.times
                                 (ReadyMsg
                                     << PageMsg
-                                    << StoryEditMsg
+                                    << StoryMsg
                                     << AnimationFrame
                                 )
                             , Overflow.lineWrapMeasured
                                 (ReadyMsg
                                     << PageMsg
-                                    << StoryEditMsg
+                                    << StoryMsg
                                     << LineWrapMeasured
                                 )
                             ]
@@ -163,6 +164,13 @@ updatePage msg s =
                     msg
                     s
 
+        ( StoryMsg msg, StoryPage s ) ->
+            mapModel StoryPage <|
+                updateStoryPage
+                    { toMsg = ReadyMsg << PageMsg << StoryMsg }
+                    msg
+                    s
+
         ( StoryEditMsg msg, StoryEditPage s ) ->
             mapModel StoryEditPage <|
                 updateStoryEdit
@@ -219,6 +227,167 @@ updateDashboard { toMsg } message s =
             { s | stories = stories } ! []
 
 
+updateStoryPage :
+    { toMsg : StoryMsg -> Msg }
+    -> StoryMsg
+    -> StoryModel
+    -> ( StoryModel, Cmd Msg )
+updateStoryPage { toMsg } message s =
+    case message of
+        -- UI
+        TextClicked itemId ->
+            s ! [ Audio.jumpTo itemId ]
+
+        -- SERVER
+        StoryReceived story ->
+            let
+                loadAudio s =
+                    s
+                        ! (RD.toMaybe s.story
+                            |> Maybe.andThen
+                                (.sentences
+                                    >> Dict.map
+                                        (\idx i ->
+                                            i.audioUrl
+                                                |> Maybe.map (flip (,) idx)
+                                        )
+                                    >> Dict.values
+                                    >> Helper.sequenceMaybe
+                                )
+                            |> Maybe.map Audio.load
+                            |> Helper.maybeToList
+                          )
+            in
+                { s
+                    | story =
+                        RD.map
+                            (\sty ->
+                                { title = sty.title
+                                , sentences =
+                                    Dict.fromList <|
+                                        List.indexedMap (,) <|
+                                            List.map
+                                                (\{ text, audioUrl } ->
+                                                    { -- [tmp] bogus value
+                                                      collapsable =
+                                                        TransView.test
+                                                    , audioUrl = audioUrl
+                                                    }
+                                                )
+                                                sty.sentences
+                                }
+                            )
+                            story
+                }
+                    ! []
+                    :> loadAudio
+
+        -- PLAYBACK
+        PlayButton ->
+            case s.playbackState of
+                NotLoaded ->
+                    s ! Debug.log "button should've been disabled" []
+
+                Stopped _ ->
+                    s ! [ Audio.play () ]
+
+                Paused _ _ _ ->
+                    s ! [ Audio.play () ]
+
+                Playing _ _ _ ->
+                    s ! [ Audio.pause () ]
+
+        RewindButton ->
+            s ! [ Audio.rewind () ]
+
+        FastForwardButton ->
+            s ! [ Audio.fastforward () ]
+
+        AudioStarted runit ->
+            -- [problem] doesn't handle error
+            s ! []
+
+        Rewinded runit ->
+            s ! []
+
+        PlaybackStateChanged ps ->
+            { s | playbackState = ps }
+                ! [ case ps of
+                        Playing cnt ct ts ->
+                            case currentItemState ps of
+                                Nothing ->
+                                    Debug.log "no item found" Cmd.none
+
+                                Just i ->
+                                    delay (i.end - ct)
+                                        (toMsg <| NextSentence cnt)
+
+                        _ ->
+                            Cmd.none
+                  ]
+
+        NextSentence cnt ->
+            case s.playbackState of
+                Playing old_cnt old_ct ts ->
+                    if cnt == old_cnt then
+                        case
+                            -- next item
+                            List.head (List.filter (\i -> i.start > old_ct) ts)
+                        of
+                            Nothing ->
+                                s ! Debug.log "no item found" []
+
+                            Just i ->
+                                { s | playbackState = Playing cnt i.start ts }
+                                    ! [ delay (duration i)
+                                            (toMsg <| NextSentence cnt)
+                                      ]
+                    else
+                        s ! []
+
+                _ ->
+                    s ! []
+
+        -- LAYOUT
+        CollapsableChange new ->
+            updateSentences
+                (Dict.update
+                    0
+                    (Maybe.map
+                        (\{ collapsable, audioUrl } ->
+                            { collapsable = new
+                            , audioUrl = audioUrl
+                            }
+                        )
+                    )
+                )
+                s
+
+        AnimationFrame _ ->
+            s ! [ Overflow.measureLineWrap "testDiv" ]
+
+        LineWrapMeasured measurement ->
+            s
+                ! Debug.log
+                    (toString <|
+                        List.foldr
+                            (\sp lines ->
+                                case lines of
+                                    [] ->
+                                        [ ( [ sp.width ], sp.top ) ]
+
+                                    ( sps, top ) :: rest ->
+                                        if sp.top == top then
+                                            ( sp.width :: sps, top ) :: rest
+                                        else
+                                            ( [ sp.width ], sp.top ) :: lines
+                            )
+                            []
+                            measurement
+                    )
+                    []
+
+
 updateStoryEdit :
     { toMsg : StoryEditMsg -> Msg }
     -> StoryEditMsg
@@ -227,6 +396,20 @@ updateStoryEdit :
 updateStoryEdit { toMsg } message s =
     case message of
         -- UI
+        AddBelowButton index ->
+            updateStory
+                (\sty ->
+                    { sty
+                        | sentences =
+                            Dict.insert sty.freshIndex
+                                -- [ hack ] tmp
+                                (ItemEdit "" Nothing)
+                                sty.sentences
+                        , freshIndex = sty.freshIndex + 1
+                    }
+                )
+                s
+
         ApplyButton storyId ->
             case s.story of
                 RD.Success draft ->
@@ -253,25 +436,8 @@ updateStoryEdit { toMsg } message s =
                 _ ->
                     s ! []
 
-        AddBelowButton index ->
-            updateStory
-                (\sty ->
-                    { sty
-                        | sentences =
-                            Dict.insert sty.freshIndex
-                                -- [ hack ] tmp
-                                (ItemEdit "" TransView.test Nothing)
-                                sty.sentences
-                        , freshIndex = sty.freshIndex + 1
-                    }
-                )
-                s
-
         DeleteButton index ->
             updateSentences (Dict.remove index) s
-
-        TextClicked itemId ->
-            s ! [ Audio.jumpTo itemId ]
 
         ItemSourceChange index txt ->
             updateSentences
@@ -281,7 +447,7 @@ updateStoryEdit { toMsg } message s =
                 s
 
         -- SERVER
-        StoryReceived story ->
+        StoryToEditReceived story ->
             { s
                 | story =
                     RD.map
@@ -293,7 +459,6 @@ updateStoryEdit { toMsg } message s =
                                         List.map
                                             (\{ text, audioUrl } ->
                                                 { text = text
-                                                , collapsable = TransView.test
                                                 , audioUrl = audioUrl
                                                 }
                                             )
@@ -368,116 +533,10 @@ updateStoryEdit { toMsg } message s =
                 )
                 s
 
-        -- PLAYBACK
-        PlayButton ->
-            case s.playbackState of
-                NotLoaded ->
-                    s ! Debug.log "button should've been disabled" []
-
-                Stopped _ ->
-                    s ! [ Audio.play () ]
-
-                Paused _ _ _ ->
-                    s ! [ Audio.play () ]
-
-                Playing _ _ _ ->
-                    s ! [ Audio.pause () ]
-
-        RewindButton ->
-            s ! [ Audio.rewind () ]
-
-        FastForwardButton ->
-            s ! [ Audio.fastforward () ]
-
-        AudioStarted runit ->
-            -- [problem] doesn't handle error
-            s ! []
-
-        Rewinded runit ->
-            s ! []
-
-        PlaybackStateChanged ps ->
-            { s | playbackState = ps }
-                ! [ case ps of
-                        Playing cnt ct ts ->
-                            case currentItemState ps of
-                                Nothing ->
-                                    Debug.log "no item found" Cmd.none
-
-                                Just i ->
-                                    delay (i.end - ct)
-                                        (toMsg <| NextSentence cnt)
-
-                        _ ->
-                            Cmd.none
-                  ]
-
-        NextSentence cnt ->
-            case s.playbackState of
-                Playing old_cnt old_ct ts ->
-                    if cnt == old_cnt then
-                        case
-                            -- next item
-                            List.head (List.filter (\i -> i.start > old_ct) ts)
-                        of
-                            Nothing ->
-                                s ! Debug.log "no item found" []
-
-                            Just i ->
-                                { s | playbackState = Playing cnt i.start ts }
-                                    ! [ delay (duration i)
-                                            (toMsg <| NextSentence cnt)
-                                      ]
-                    else
-                        s ! []
-
-                _ ->
-                    s ! []
-
         -- TEST
         -- [todo] do something nontrivial
         TestNativeStart runit ->
             s ! Debug.log "in TestNativeStart" []
-
-        -- LAYOUT
-        CollapsableChange new ->
-            updateSentences
-                (Dict.update
-                    0
-                    (Maybe.map
-                        (\{ text, collapsable, audioUrl } ->
-                            { text = text
-                            , collapsable = new
-                            , audioUrl = audioUrl
-                            }
-                        )
-                    )
-                )
-                s
-
-        AnimationFrame _ ->
-            s ! [ Overflow.measureLineWrap "testDiv" ]
-
-        LineWrapMeasured measurement ->
-            s
-                ! Debug.log
-                    (toString <|
-                        List.foldr
-                            (\sp lines ->
-                                case lines of
-                                    [] ->
-                                        [ ( [ sp.width ], sp.top ) ]
-
-                                    ( sps, top ) :: rest ->
-                                        if sp.top == top then
-                                            ( sp.width :: sps, top ) :: rest
-                                        else
-                                            ( [ sp.width ], sp.top ) :: lines
-                            )
-                            []
-                            measurement
-                    )
-                    []
 
 
 
@@ -519,7 +578,7 @@ storyFromDraft draft =
     { title = draft.title
     , sentences =
         List.map
-            (\{ text, collapsable, audioUrl } ->
+            (\{ text, audioUrl } ->
                 { text = text, audioUrl = audioUrl }
             )
         <|
@@ -566,6 +625,24 @@ routeChange route app =
     let
         ( newPage, cmd ) =
             case route of
+                Routing.Story storyid ->
+                    defaultLogin app <|
+                        \user ->
+                            let
+                                s =
+                                    initStory user
+                            in
+                                StoryPage { s | story = RD.Loading }
+                                    ! [ Server.sendW
+                                            (ReadyMsg
+                                                << PageMsg
+                                                << StoryMsg
+                                                << StoryReceived
+                                            )
+                                            (Api.getApiStoryById storyid)
+                                      , Overflow.checkOverflow "testId"
+                                      ]
+
                 Routing.StoryNew ->
                     defaultLogin app <|
                         \user ->
@@ -598,10 +675,9 @@ routeChange route app =
                                             (ReadyMsg
                                                 << PageMsg
                                                 << StoryEditMsg
-                                                << StoryReceived
+                                                << StoryToEditReceived
                                             )
                                             (Api.getApiStoryById storyid)
-                                      , Overflow.checkOverflow "testId"
                                       ]
 
                 Routing.Login ->
@@ -647,6 +723,9 @@ user app =
                     page.user
 
                 Dashboard page ->
+                    Just page.user
+
+                StoryPage page ->
                     Just page.user
 
                 StoryEditPage page ->

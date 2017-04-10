@@ -39,6 +39,7 @@ type alias ReadyModel =
 type PageModel
     = LoginPage LoginModel
     | Dashboard DashboardModel
+    | StoryPage StoryModel
     | StoryEditPage StoryEditModel
 
 
@@ -70,10 +71,33 @@ type alias DashboardModel =
     }
 
 
+type alias StoryModel =
+    { story : Web StoryState
+    , playbackState : PlaybackState
+    , user : User
+    }
+
+
+type alias StoryState =
+    { title : String
+    , sentences :
+        Dict.Dict Int
+            { collapsable : Trans.Collapsable String Trans.Word
+            , audioUrl : Maybe String
+            }
+    }
+
+
+initStory user =
+    { story = RD.NotAsked
+    , playbackState = NotLoaded
+    , user = user
+    }
+
+
 type alias StoryEditModel =
     { story : Web StoryDraft
     , recordingId : Maybe ItemId
-    , playbackState : PlaybackState
     , user : User
     , mode : StoryEditMode
     }
@@ -82,7 +106,6 @@ type alias StoryEditModel =
 initStoryEdit user mode =
     { story = RD.NotAsked
     , recordingId = Nothing
-    , playbackState = NotLoaded
     , user = user
     , mode = mode
     }
@@ -150,10 +173,7 @@ type StoryEditMode
 
 
 type alias ItemEdit =
-    { text :
-        String
-        -- [hack] [tmp]
-    , collapsable : Trans.Collapsable String Trans.Word
+    { text : String
     , audioUrl : Maybe String
     }
 

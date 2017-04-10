@@ -1,6 +1,11 @@
 module Helper exposing (..)
 
 
+maybeToList : Maybe a -> List a
+maybeToList =
+    Maybe.map List.singleton >> Maybe.withDefault []
+
+
 sequenceMaybe : List (Maybe a) -> Maybe (List a)
 sequenceMaybe =
     List.foldr (\m -> Maybe.andThen (\l -> Maybe.map (flip (::) l) m))

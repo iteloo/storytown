@@ -5,6 +5,7 @@ import Message exposing (..)
 import MyCss exposing (CssClass(..))
 import Routing
 import TransView
+import Parser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -57,6 +58,9 @@ appView s =
 
                 Dashboard s ->
                     Html.map DashboardMsg (dashboardView s)
+
+                StoryPage s ->
+                    Html.map StoryMsg (storyView s)
 
                 StoryEditPage s ->
                     Html.map StoryEditMsg (storyEditView s)
@@ -149,24 +153,34 @@ teacherDashboard s =
                 text "Cannot load..."
 
             RD.Success stories ->
-                ListGroup.ul <| List.map storyItemView stories
+                ListGroup.custom <|
+                    List.map storyItemView stories
         ]
 
 
 storyItemView ( storyId, story ) =
-    ListGroup.li []
-        [ a
-            [ href (Routing.makePath (Routing.StoryEdit storyId)) ]
-            [ text story.title ]
+    ListGroup.anchor
+        [ ListGroup.attrs
+            [ Html.Attributes.class "justify-content-between"
+            , href (Routing.makePath (Routing.Story storyId))
+            ]
+        ]
+        [ text story.title
+        , Button.linkButton
+            [ Button.success
+            , Button.attrs
+                [ href (Routing.makePath (Routing.StoryEdit storyId)) ]
+            ]
+            [ text "Edit" ]
         ]
 
 
 
--- ITEM VIEW
+-- STORY VIEW
 
 
-storyEditView : StoryEditModel -> Html StoryEditMsg
-storyEditView s =
+storyView : StoryModel -> Html StoryMsg
+storyView s =
     Grid.container []
         [ playbackView s
         , case s.story of
@@ -183,86 +197,17 @@ storyEditView s =
                 div [ class [ Table ] ] <|
                     Dict.values <|
                         Dict.map
-                            (\index item -> itemView s index item)
+                            (\index item -> TransView.view item.collapsable)
                             story.sentences
-        , button [ onClick (AddBelowButton 0) ] [ text "+" ]
-        , case s.mode of
-            New ->
-                button [ onClick CreateButton ] [ text "Create" ]
-
-            Existing storyId ->
-                button [ onClick (ApplyButton storyId) ] [ text "Apply" ]
         ]
 
 
-itemView { playbackState, recordingId } index item =
+itemView { playbackState } index item =
     div [ class [ Row ] ]
         [ div [ class [ Cell ] ]
-            [ button [ onClick (DeleteButton index) ] [ text "x" ] ]
-        , div [ class [ Cell ] ]
             [ div [ class [ Table ] ]
                 [ div [ class [ Cell ] ]
-                    [ case recordingId of
-                        Nothing ->
-                            button [ onClick (RecordButton index) ]
-                                [ text "record" ]
-
-                        Just recId ->
-                            if recId == index then
-                                button [ onClick (RecordButton index) ]
-                                    [ text "stop rec" ]
-                            else
-                                button [ disabled True ]
-                                    [ text "record" ]
-                    ]
-                , case item.audioUrl of
-                    Nothing ->
-                        text "No audio"
-
-                    Just url ->
-                        audio
-                            [ controls True
-                            , src url
-                            ]
-                            []
-                ]
-            , div [ class [ Table ] ]
-                [ div [ class [ Cell ] ]
-                    [ let
-                        txt =
-                            a
-                                (if
-                                    isPaused playbackState
-                                        || isPlaying playbackState
-                                 then
-                                    [ onClick (TextClicked index) ]
-                                 else
-                                    []
-                                )
-                                [ textarea
-                                    [ placeholder "Write something..."
-                                    , onInput (ItemSourceChange index)
-                                    ]
-                                    [ text item.text ]
-                                ]
-                      in
-                        if
-                            currentItemState playbackState
-                                |> Maybe.map ((==) index << .itemId)
-                                |> Maybe.withDefault False
-                        then
-                            mark []
-                                [ txt ]
-                        else
-                            txt
-                    ]
-                  -- , case Parser.parseTranslatedText item.text of
-                  --     Ok r ->
-                  --         transView r
-                  --
-                  --     Err e ->
-                  --         text e
-                , TransView.view item.collapsable
+                    [ TransView.view item.collapsable ]
                 ]
             , div [ Html.Attributes.id "testDiv" ] <|
                 List.map
@@ -277,6 +222,110 @@ itemView { playbackState, recordingId } index item =
 
 loremIpsum =
     "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum"
+
+
+
+-- STORY EDIT VIEW
+
+
+storyEditView : StoryEditModel -> Html StoryEditMsg
+storyEditView s =
+    Grid.container []
+        [ case s.story of
+            RD.NotAsked ->
+                br [] []
+
+            RD.Loading ->
+                text "Loading..."
+
+            RD.Failure e ->
+                text "Cannot load..."
+
+            RD.Success story ->
+                div [ class [ Table ] ] <|
+                    Dict.values <|
+                        Dict.map
+                            (\index item -> itemEditView s index item)
+                            story.sentences
+        , button [ onClick (AddBelowButton 0) ] [ text "+" ]
+        , case s.mode of
+            New ->
+                button [ onClick CreateButton ] [ text "Create" ]
+
+            Existing storyId ->
+                button [ onClick (ApplyButton storyId) ] [ text "Apply" ]
+        ]
+
+
+itemEditView { recordingId } index item =
+    div [ class [ Row ] ]
+        [ div [ class [ Cell ] ]
+            [ button [ onClick (DeleteButton index) ] [ text "x" ] ]
+        , div [ class [ Cell ] ]
+            [ div [ class [ Flex ] ]
+                [ case recordingId of
+                    Nothing ->
+                        button [ onClick (RecordButton index) ]
+                            [ text "record" ]
+
+                    Just recId ->
+                        if recId == index then
+                            button [ onClick (RecordButton index) ]
+                                [ text "stop rec" ]
+                        else
+                            button [ disabled True ]
+                                [ text "record" ]
+                , case item.audioUrl of
+                    Nothing ->
+                        text "No audio"
+
+                    Just url ->
+                        audio
+                            [ controls True
+                            , src url
+                            ]
+                            []
+                ]
+            , div [ class [ Flex ] ]
+                [ textarea
+                    [ placeholder "Write something..."
+                    , onInput (ItemSourceChange index)
+                    ]
+                    [ text item.text ]
+                , div [ class [ Table ] ]
+                    [ case Parser.parseTranslatedText item.text of
+                        Ok r ->
+                            div [] <| List.map transView r
+
+                        Err e ->
+                            text e
+                    ]
+                ]
+            ]
+        ]
+
+
+transView : Parser.TranslatedBlock -> Html StoryEditMsg
+transView tb =
+    case tb of
+        Parser.L2Word w ->
+            span [ class [ Cell, Orig ] ] [ text (w ++ " ") ]
+
+        Parser.TranslatedBlock bs tr ->
+            div [ class [ Cell ] ]
+                [ div [ class [ Row ] ]
+                    [ div [] <| List.map transView <| Nonempty.toList bs ]
+                , div [ class [ SidePadding ] ]
+                    [ div
+                        [ class [ Hoverarea ]
+                        ]
+                        [ div [ class [ Padding ] ]
+                            [ div [ class [ Trans ] ]
+                                [ text tr ]
+                            ]
+                        ]
+                    ]
+                ]
 
 
 

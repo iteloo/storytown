@@ -18,7 +18,7 @@ import Html.CssHelpers
     Html.CssHelpers.withNamespace MyCss.storytown
 
 
-view : Collapsable String Word -> Html StoryEditMsg
+view : Collapsable String Word -> Html StoryMsg
 view collapsable =
     div [ class [ Table ] ]
         [ collapsableView (initViewCollapsable collapsable)
@@ -57,7 +57,7 @@ initViewCollapsable =
 
 collapsableView :
     Collapsable ( String, Maybe (CursorZipper String Word) ) Word
-    -> Html StoryEditMsg
+    -> Html StoryMsg
 collapsableView collapsable =
     case collapsable of
         LoneWord w ->
@@ -100,8 +100,8 @@ collapsableView collapsable =
 
 genericBlockView :
     ( String, Maybe (CursorZipper String Word) )
-    -> List (Html StoryEditMsg)
-    -> Html StoryEditMsg
+    -> List (Html StoryMsg)
+    -> Html StoryMsg
 genericBlockView ( tr, z ) childViews =
     div [ class [ Cell ] ]
         [ div [ class [ Row ] ]
@@ -126,6 +126,36 @@ genericBlockView ( tr, z ) childViews =
 
 wordView w =
     span [ class [ Cell, Orig ] ] [ text (w ++ " ") ]
+
+
+
+--  let
+--     txt =
+--         a
+--             (if
+--                 isPaused playbackState
+--                     || isPlaying playbackState
+--              then
+--                 [ onClick (TextClicked index) ]
+--              else
+--                 []
+--             )
+--             [ textarea
+--                 [ placeholder "Write something..."
+--                 , onInput (ItemSourceChange index)
+--                 ]
+--                 [ text item.text ]
+--             ]
+--   in
+--     if
+--         currentItemState playbackState
+--             |> Maybe.map ((==) index << .itemId)
+--             |> Maybe.withDefault False
+--     then
+--         mark []
+--             [ txt ]
+--     else
+--         txt
 
 
 addMin z =

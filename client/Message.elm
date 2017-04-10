@@ -35,6 +35,7 @@ type ReadyMsg
 type PageMsg
     = LoginMsg LoginMsg
     | DashboardMsg DashboardMsg
+    | StoryMsg StoryMsg
     | StoryEditMsg StoryEditMsg
 
 
@@ -51,16 +52,34 @@ type DashboardMsg
     = StoriesReceived (Web (List ( StoryId, Api.Story )))
 
 
+type StoryMsg
+    = -- UI
+      TextClicked ItemId
+      -- SERVER
+    | StoryReceived (Web Api.Story)
+      -- PLAYBACK
+    | PlayButton
+    | RewindButton
+    | FastForwardButton
+    | AudioStarted (Result () ())
+    | Rewinded (Result () ())
+    | PlaybackStateChanged PlaybackState
+    | NextSentence Int
+      -- LAYOUT
+    | CollapsableChange (Trans.Collapsable String Trans.Word)
+    | AnimationFrame Time.Time
+    | LineWrapMeasured Overflow.Measurement
+
+
 type StoryEditMsg
     = -- UI
       AddBelowButton Int
     | ApplyButton StoryId
     | CreateButton
     | DeleteButton ItemId
-    | TextClicked ItemId
     | ItemSourceChange Int String
       -- SERVER
-    | StoryReceived (Web Api.Story)
+    | StoryToEditReceived (Web Api.Story)
     | StoryCreatedOrUpdated
       -- REC: UI
     | RecordButton ItemId
@@ -70,17 +89,5 @@ type StoryEditMsg
     | S3SignedRequestAudio ItemId MR.Blob String
       -- REC: S3
     | S3UploadDone String ItemId
-      -- PLAYBACK
-    | PlayButton
-    | RewindButton
-    | FastForwardButton
-    | AudioStarted (Result () ())
-    | Rewinded (Result () ())
-    | PlaybackStateChanged PlaybackState
-    | NextSentence Int
       -- TEST
     | TestNativeStart (Result MR.Error ())
-      -- LAYOUT
-    | CollapsableChange (Trans.Collapsable String Trans.Word)
-    | AnimationFrame Time.Time
-    | LineWrapMeasured Overflow.Measurement
