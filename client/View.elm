@@ -6,6 +6,7 @@ import MyCss exposing (CssClass(..))
 import Routing
 import TransView
 import Parser
+import Helper
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -139,8 +140,10 @@ dashboardView s =
 teacherDashboard s =
     Grid.container []
         [ h2 [] [ text "Teacher Dashboard" ]
-        , Button.linkButton
-            [ Button.attrs [ href (Routing.makePath (Routing.StoryNew)) ] ]
+        , Button.button
+            [ Button.primary
+            , Button.attrs [ href (Routing.makePath (Routing.StoryNew)) ]
+            ]
             [ text "New Story" ]
         , case s.stories of
             RD.NotAsked ->
@@ -248,12 +251,39 @@ storyEditView s =
                             (\index item -> itemEditView s index item)
                             story.sentences
         , button [ onClick (AddBelowButton 0) ] [ text "+" ]
-        , case s.mode of
-            New ->
-                button [ onClick CreateButton ] [ text "Create" ]
+        , let
+            submitButton s text_ onClick_ =
+                Button.button
+                    [ Button.success
+                    , Button.disabled <|
+                        case s.story of
+                            RD.Success story ->
+                                (story.sentences
+                                    |> Dict.values
+                                    |> List.any
+                                        (.text
+                                            >> Parser.parseTranslatedText
+                                            >> Helper.isErr
+                                        )
+                                )
+                                    || Dict.isEmpty story.sentences
 
-            Existing storyId ->
-                button [ onClick (ApplyButton storyId) ] [ text "Apply" ]
+                            _ ->
+                                True
+                    , Button.attrs <|
+                        if RD.isSuccess s.story then
+                            [ onClick onClick_ ]
+                        else
+                            []
+                    ]
+                    [ text text_ ]
+          in
+            case s.mode of
+                New ->
+                    submitButton s "Create" CreateButton
+
+                Existing storyId ->
+                    submitButton s "Apply" (ApplyButton storyId)
         ]
 
 

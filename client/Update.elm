@@ -143,38 +143,42 @@ updateReady msg s =
             { s | navState = state } ! []
 
         PageMsg msg ->
-            updatePage msg s.page
+            updatePage { toMsg = ReadyMsg << PageMsg } msg s.page
                 |> mapModel (\newPage -> { s | page = newPage })
 
 
-updatePage : PageMsg -> PageModel -> ( PageModel, Cmd Msg )
-updatePage msg s =
+updatePage :
+    { toMsg : PageMsg -> Msg }
+    -> PageMsg
+    -> PageModel
+    -> ( PageModel, Cmd Msg )
+updatePage { toMsg } msg s =
     case ( msg, s ) of
         ( LoginMsg msg, LoginPage s ) ->
             mapModel LoginPage <|
                 updateLogin
-                    { toMsg = ReadyMsg << PageMsg << LoginMsg }
+                    { toMsg = toMsg << LoginMsg }
                     msg
                     s
 
         ( DashboardMsg msg, Dashboard s ) ->
             mapModel Dashboard <|
                 updateDashboard
-                    { toMsg = ReadyMsg << PageMsg << DashboardMsg }
+                    { toMsg = toMsg << DashboardMsg }
                     msg
                     s
 
         ( StoryMsg msg, StoryPage s ) ->
             mapModel StoryPage <|
                 updateStoryPage
-                    { toMsg = ReadyMsg << PageMsg << StoryMsg }
+                    { toMsg = toMsg << StoryMsg }
                     msg
                     s
 
         ( StoryEditMsg msg, StoryEditPage s ) ->
             mapModel StoryEditPage <|
                 updateStoryEdit
-                    { toMsg = ReadyMsg << PageMsg << StoryEditMsg }
+                    { toMsg = toMsg << StoryEditMsg }
                     msg
                     s
 
@@ -422,7 +426,7 @@ updateStoryEdit { toMsg } message s =
                           ]
 
                 _ ->
-                    s ! []
+                    Debug.crash "Button should be disabled!"
 
         CreateButton ->
             case s.story of
@@ -434,7 +438,7 @@ updateStoryEdit { toMsg } message s =
                           ]
 
                 _ ->
-                    s ! []
+                    Debug.crash "Button should be disabled!"
 
         DeleteButton index ->
             updateSentences (Dict.remove index) s
@@ -479,10 +483,30 @@ updateStoryEdit { toMsg } message s =
         RecordButton itemid ->
             case s.recordingId of
                 Nothing ->
-                    startRecording itemid s
+                    -- [todo] adds error handling
+                    { s | recordingId = Just itemid }
+                        ! [ Task.attempt
+                                (toMsg << TestNativeStart)
+                                (MR.start ())
+                          ]
 
                 Just itemid ->
-                    stopRecording s
+                    -- [note] don't set recordingId to Nothing yet
+                    --        since we need to wait for file
+                    s
+                        ! [ Task.attempt
+                                (\r ->
+                                    case r of
+                                        Err e ->
+                                            Debug.crash <|
+                                                "audio file failed "
+                                                    ++ "to be prepared"
+
+                                        Ok r ->
+                                            (toMsg << FileReady) r
+                                )
+                                (MR.stop ())
+                          ]
 
         -- REC: NATIVE
         FileReady ( url, blob ) ->
@@ -499,7 +523,9 @@ updateStoryEdit { toMsg } message s =
                         :> updateSentences
                             (Dict.update itemid
                                 (Maybe.map
-                                    (\item -> { item | audioUrl = Just url })
+                                    (\item ->
+                                        { item | audioUrl = Just url }
+                                    )
                                 )
                             )
 
@@ -524,7 +550,9 @@ updateStoryEdit { toMsg } message s =
                     case Dict.get itemid ss of
                         Nothing ->
                             Debug.crash
-                                ("missing item with id: " ++ toString itemid)
+                                ("missing item with id: "
+                                    ++ toString itemid
+                                )
 
                         Just item ->
                             Dict.insert itemid
@@ -537,36 +565,6 @@ updateStoryEdit { toMsg } message s =
         -- [todo] do something nontrivial
         TestNativeStart runit ->
             s ! Debug.log "in TestNativeStart" []
-
-
-
--- AUDIO
-
-
-startRecording itemid s =
-    -- [todo] adds error handling
-    { s | recordingId = Just itemid }
-        ! [ Task.attempt
-                (ReadyMsg << PageMsg << StoryEditMsg << TestNativeStart)
-                (MR.start ())
-          ]
-
-
-stopRecording s =
-    -- [note] don't set to false yet since we need to wait for file
-    s
-        ! [ Task.attempt
-                (\r ->
-                    case r of
-                        Err e ->
-                            Debug.crash "audio file failed to be prepared"
-
-                        Ok r ->
-                            (ReadyMsg << PageMsg << StoryEditMsg << FileReady)
-                                r
-                )
-                (MR.stop ())
-          ]
 
 
 

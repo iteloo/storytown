@@ -12,6 +12,26 @@ sequenceMaybe =
         (Just [])
 
 
+isOk : Result e a -> Bool
+isOk r =
+    case r of
+        Ok _ ->
+            True
+
+        Err _ ->
+            False
+
+
+isErr : Result e a -> Bool
+isErr r =
+    case r of
+        Ok _ ->
+            False
+
+        Err _ ->
+            True
+
+
 
 -- SCRAPS
 
