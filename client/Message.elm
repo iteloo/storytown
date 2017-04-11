@@ -5,7 +5,7 @@ import Api
 import MediaRecorder as MR
 import Navigation as Nav
 import RemoteData as RD
-import Trans
+import Translation.Base as Trans
 import Overflow
 import Http
 import Time

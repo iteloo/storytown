@@ -8,7 +8,7 @@ import S3
 import Api
 import Audio
 import MediaRecorder as MR
-import Trans
+import Translation.Base as Trans
 import Parser
 import Overflow
 import Helper

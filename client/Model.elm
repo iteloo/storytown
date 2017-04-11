@@ -8,7 +8,7 @@ import Time
 import Navigation as Nav
 import List.Zipper exposing (Zipper)
 import Bootstrap.Navbar as Navbar
-import Trans
+import Translation.Base as Trans
 
 
 type alias Model =
