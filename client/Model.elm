@@ -103,6 +103,24 @@ type alias StoryEditModel =
     }
 
 
+type alias StoryDraft =
+    { title : String
+    , sentences : Dict.Dict Int ItemEdit
+    , freshIndex : Int
+    }
+
+
+type StoryEditMode
+    = New
+    | Existing StoryId
+
+
+type alias ItemEdit =
+    { text : String
+    , audioUrl : Maybe String
+    }
+
+
 initStoryEdit user mode =
     { story = RD.NotAsked
     , recordingId = Nothing
@@ -158,24 +176,6 @@ apiUserToUser apiUser =
 
 type alias Web a =
     RD.RemoteData () a
-
-
-type alias StoryDraft =
-    { title : String
-    , sentences : Dict.Dict Int ItemEdit
-    , freshIndex : Int
-    }
-
-
-type StoryEditMode
-    = New
-    | Existing StoryId
-
-
-type alias ItemEdit =
-    { text : String
-    , audioUrl : Maybe String
-    }
 
 
 type PlaybackState

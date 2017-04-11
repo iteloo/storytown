@@ -140,9 +140,9 @@ dashboardView s =
 teacherDashboard s =
     Grid.container []
         [ h2 [] [ text "Teacher Dashboard" ]
-        , Button.button
+        , Button.linkButton
             [ Button.primary
-            , Button.attrs [ href (Routing.makePath (Routing.StoryNew)) ]
+            , Button.attrs [ href (Routing.makePath Routing.StoryNew) ]
             ]
             [ text "New Story" ]
         , case s.stories of
@@ -233,7 +233,7 @@ loremIpsum =
 
 storyEditView : StoryEditModel -> Html StoryEditMsg
 storyEditView s =
-    Grid.container []
+    Grid.container [] <|
         [ case s.story of
             RD.NotAsked ->
                 br [] []
@@ -283,14 +283,37 @@ storyEditView s =
                     submitButton s "Create" CreateButton
 
                 Existing storyId ->
-                    submitButton s "Apply" (ApplyButton storyId)
+                    submitButton s "Apply Changes" (ApplyButton storyId)
+        , Button.button
+            [ Button.warning
+            , Button.attrs [ onClick DiscardButton ]
+            ]
+            [ text <|
+                case s.mode of
+                    New ->
+                        "Discard Draft"
+
+                    Existing _ ->
+                        "Discard Changes"
+            ]
         ]
+            ++ case s.mode of
+                New ->
+                    []
+
+                Existing _ ->
+                    [ Button.button
+                        [ Button.danger
+                        , Button.attrs [ onClick DeleteStoryButton ]
+                        ]
+                        [ text "Delete Story" ]
+                    ]
 
 
 itemEditView { recordingId } index item =
     div [ class [ Row ] ]
         [ div [ class [ Cell ] ]
-            [ button [ onClick (DeleteButton index) ] [ text "x" ] ]
+            [ button [ onClick (DeleteItemButton index) ] [ text "x" ] ]
         , div [ class [ Cell ] ]
             [ div [ class [ Flex ] ]
                 [ case recordingId of

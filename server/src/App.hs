@@ -213,8 +213,9 @@ putStory storyId story = runDb $ do
 
 deleteStory :: StoryId -> MyHandler NoContent
 deleteStory storyid = runDb $ do
-    DB.delete (DB.toSqlKey storyid :: Key DStory)
+    -- [note] must delete sentences before deleting the story
     deleteAllSentences storyid
+    DB.delete (DB.toSqlKey storyid :: Key DStory)
     return NoContent
 
 insertSentencesForStory storyId story =

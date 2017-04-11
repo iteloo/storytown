@@ -445,7 +445,22 @@ updateStoryEdit { toMsg } message s =
                 _ ->
                     Debug.crash "Button should be disabled!"
 
-        DeleteButton index ->
+        DiscardButton ->
+            gotoRoute Routing.Dashboard s
+
+        DeleteStoryButton ->
+            case s.mode of
+                New ->
+                    Debug.crash "Delete button shouldn't exist in New mode"
+
+                Existing storyId ->
+                    s
+                        ! [ Server.send
+                                (always (toMsg <| StoryDeleted storyId))
+                                (Api.deleteApiStoryById storyId)
+                          ]
+
+        DeleteItemButton index ->
             updateSentences (Dict.remove index) s
 
         ItemSourceChange index txt ->
@@ -483,6 +498,9 @@ updateStoryEdit { toMsg } message s =
             { s | story = RD.NotAsked }
                 ! []
                 :> gotoRoute Routing.Dashboard
+
+        StoryDeleted storyId ->
+            gotoRoute Routing.Dashboard s
 
         -- REC: UI
         RecordButton itemid ->

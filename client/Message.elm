@@ -76,11 +76,14 @@ type StoryEditMsg
       AddBelowButton Int
     | ApplyButton StoryId
     | CreateButton
-    | DeleteButton ItemId
+    | DiscardButton
+    | DeleteStoryButton
+    | DeleteItemButton ItemId
     | ItemSourceChange Int String
       -- SERVER
     | StoryToEditReceived (Web Api.Story)
     | StoryCreatedOrUpdated
+    | StoryDeleted StoryId
       -- REC: UI
     | RecordButton ItemId
       -- REC: NATIVE
