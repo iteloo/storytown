@@ -1,6 +1,7 @@
 module Helper exposing (..)
 
-import List.Nonempty as Nonempty exposing (Nonempty(..))
+import Lazy
+import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 
 
 maybeToList : Maybe a -> List a
@@ -12,11 +13,6 @@ sequenceMaybe : List (Maybe a) -> Maybe (List a)
 sequenceMaybe =
     List.foldr (\m -> Maybe.andThen (\l -> Maybe.map (flip (::) l) m))
         (Just [])
-
-
-
--- foldlMaybe : (a -> b -> Maybe b) -> b -> List a -> Maybe (List b)
--- foldlMaybe mf b =
 
 
 isOk : Result e a -> Bool
@@ -63,11 +59,44 @@ appendToNonempty xs (Nonempty y ys) =
     Nonempty y (ys ++ xs)
 
 
-mapFst f ( a, b ) =
-    ( f a, b )
+nonemptyfoldr : (a -> u -> s) -> (a -> u -> u) -> u -> Nonempty a -> s
+nonemptyfoldr nonempty tcons tnil (Nonempty x xs) =
+    nonempty x (List.foldr tcons tnil xs)
+
+
+nonemptyLast : Nonempty a -> a
+nonemptyLast =
+    Nonempty.head << Nonempty.reverse
+
+
+truncateAfter : (a -> Bool) -> Nonempty a -> Nonempty (Nonempty a)
+truncateAfter cond =
+    let
+        mkCons :
+            (Nonempty a -> List (Nonempty a) -> s)
+            -> a
+            -> List (Nonempty a)
+            -> s
+        mkCons cons =
+            (\a segs ->
+                if cond a then
+                    cons (Nonempty.fromElement a) segs
+                else
+                    case segs of
+                        [] ->
+                            cons (Nonempty.fromElement a) []
+
+                        x :: xs ->
+                            cons (a ::: x) xs
+            )
+    in
+        nonemptyfoldr (mkCons Nonempty) (mkCons (::)) []
 
 
 
+-- undefined : a
+-- undefined =
+--     Lazy.force <| Lazy.lazy <| \() -> Debug.crash "undefined"
 -- SCRAPS
 
 

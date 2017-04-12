@@ -8,9 +8,77 @@ type AtLeastOneOf a b
     = AtLeastOneOf (List b) a (List (Either a b))
 
 
+{-| AtLeastOneOf a b ~ s
+    List b ~ t
+    b ~ b
+    a ~ a
+    List (Either a b) u
+    Either a b ~ v
+-}
+foldr :
+    -- AtLeastOneOf
+    (t -> a -> u -> s)
+    -- (::)
+    -> (b -> t -> t)
+       -- []
+    -> t
+       -- (::)
+    -> (v -> u -> u)
+       -- []
+    -> u
+       -- Left
+    -> (a -> v)
+       -- Right
+    -> (b -> v)
+    -> AtLeastOneOf a b
+    -> s
+foldr atLeastOneOf cn1 n1 cn2 n2 l r (AtLeastOneOf bs a abs) =
+    atLeastOneOf (List.foldr cn1 n1 bs)
+        a
+        (List.foldr cn2 n2 (List.map (Either.fromEither l r) abs))
+
+
 toList : AtLeastOneOf a a -> List a
 toList (AtLeastOneOf before focus after) =
-    before ++ [ focus ] ++ List.map (Either.fromEither identity identity) after
+    List.concat
+        [ before
+        , [ focus ]
+        , List.map (Either.fromEither identity identity) after
+        ]
+
+
+fromList : List (Either a b) -> Either (AtLeastOneOf a b) (List b)
+fromList =
+    List.foldl
+        (\ab ebs ->
+            case ebs of
+                Right bs ->
+                    ab
+                        |> Either.mapRight
+                            (\b -> bs ++ [ b ])
+                        |> Either.mapLeft
+                            (\a -> AtLeastOneOf bs a [])
+
+                Left (AtLeastOneOf before a after) ->
+                    Left (AtLeastOneOf before a (after ++ [ ab ]))
+        )
+        (Right [])
+
+
+{-| [note] kind of weird focus can be anywhere in `AtLeastOneOf a a`
+-}
+toNonempty : AtLeastOneOf a a -> Nonempty a
+toNonempty (AtLeastOneOf before focus after) =
+    let
+        after_ =
+            List.map (Either.fromEither identity identity) after
+    in
+        case before of
+            [] ->
+                Nonempty focus after_
+
+            x :: xs ->
+                Nonempty x (xs ++ [ focus ] ++ after_)
 
 
 fromNonempty : Nonempty (Either a b) -> Either (AtLeastOneOf a b) (Nonempty b)
@@ -33,24 +101,6 @@ fromNonempty (Nonempty b1 bs) =
             |> Either.mapLeft (\a -> AtLeastOneOf [] a [])
         )
         bs
-
-
-fromList : List (Either a b) -> Either (AtLeastOneOf a b) (List b)
-fromList =
-    List.foldl
-        (\ab ebs ->
-            case ebs of
-                Right bs ->
-                    ab
-                        |> Either.mapRight
-                            (\b -> bs ++ [ b ])
-                        |> Either.mapLeft
-                            (\a -> AtLeastOneOf bs a [])
-
-                Left (AtLeastOneOf before a after) ->
-                    Left (AtLeastOneOf before a (after ++ [ ab ]))
-        )
-        (Right [])
 
 
 map : (a -> c) -> (b -> d) -> AtLeastOneOf a b -> AtLeastOneOf c d

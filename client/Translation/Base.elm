@@ -134,6 +134,60 @@ type LeafZipper a b
     = LeafZipper b (Ctx a b)
 
 
+{-| a ~ a
+    b ~ b
+    Collapsable ~ s
+    Block ~ t
+    CursorBlock ~ u
+-}
+foldr :
+    -- LoneWord
+    (b -> s)
+    -- Block
+    -> (t -> s)
+       -- CursorBlock
+    -> (u -> t)
+       -- ExpandedBlock
+    -> (a -> AtLeastOneOf t b -> t)
+       -- TerminalBlock
+    -> (a -> Nonempty b -> u)
+       -- CollapsedBlock
+    -> (a -> AtLeastOneOf u b -> u)
+    -> Collapsable a b
+    -> s
+foldr loneWord block cursorBlock expandedBlock terminalBlock collapsedBlock col =
+    case col of
+        LoneWord w ->
+            loneWord w
+
+        Block blk ->
+            let
+                goBlock blk =
+                    case blk of
+                        CursorBlock cblk ->
+                            let
+                                goCursorBlock cblk =
+                                    case cblk of
+                                        TerminalBlock a bs ->
+                                            terminalBlock a bs
+
+                                        CollapsedBlock a bs ->
+                                            collapsedBlock a
+                                                (AtLeastOneOf.map
+                                                    goCursorBlock
+                                                    identity
+                                                    bs
+                                                )
+                            in
+                                cursorBlock <| goCursorBlock cblk
+
+                        ExpandedBlock a bs ->
+                            expandedBlock a
+                                (AtLeastOneOf.map goBlock identity bs)
+            in
+                block <| goBlock blk
+
+
 
 -- FROM TRANSLATED BLOCKS
 
