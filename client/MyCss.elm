@@ -16,6 +16,7 @@ type CssClass
     | Row
     | Cell
     | Orig
+    | MeasurementDiv
     | SidePadding
     | Padding
     | Trans
@@ -29,6 +30,9 @@ type CssClass
 css =
     (stylesheet << namespace storytown) <|
         let
+            origFontSize =
+                pt 36
+
             expandCollapse =
                 let
                     onHover =
@@ -74,9 +78,12 @@ css =
                 [ display tableCell
                 , textAlign center
                 , withClass Orig
-                    [ fontSize (pt 36)
+                    [ fontSize origFontSize
                     , property "white-space" "pre"
                     ]
+                ]
+            , class MeasurementDiv
+                [ fontSize origFontSize
                 ]
             , class SidePadding
                 [ paddingLeft (pt 2)

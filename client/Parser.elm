@@ -52,10 +52,12 @@ type alias ParseState =
     Nonempty Int
 
 
+countSpaces : Parser s Int
 countSpaces =
     map String.length (regex " *")
 
 
+indentation : Parser ParseState a -> Parser ParseState a
 indentation p =
     withState
         (\s ->
@@ -73,6 +75,7 @@ indentation p =
         *> p
 
 
+indent : Parser ParseState ()
 indent =
     lookAhead <|
         countSpaces
@@ -86,6 +89,7 @@ indent =
                 )
 
 
+unindent : Parser ParseState ()
 unindent =
     lookAhead <|
         countSpaces
@@ -133,15 +137,18 @@ exprs =
     manyTill expr end
 
 
+notEol : Parser s Char
 notEol =
     noneOf [ '\x0D', '\n' ]
 
 
+line : Parser s String
 line =
     -- [todo] can be made more efficient
     map String.fromList (manyTill anyChar eol <|> manyTill anyChar end)
 
 
+translatedText : Parser ParseState TranslatedBlock
 translatedText =
     map translatedBlockFromExpr expr <* end
 

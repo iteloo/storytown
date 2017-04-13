@@ -18,6 +18,7 @@ type Collapsable a b
     | Block (Block a b)
 
 
+mapCollapsable : (a -> c) -> (b -> d) -> Collapsable a b -> Collapsable c d
 mapCollapsable f g c =
     case c of
         LoneWord b ->
@@ -42,6 +43,7 @@ mapBlock f g block =
             ExpandedBlock (f a) (AtLeastOneOf.map (mapBlock f g) g bs)
 
 
+getNodeBlock : Block a b -> a
 getNodeBlock block =
     case block of
         ExpandedBlock a _ ->
@@ -56,6 +58,7 @@ type CursorBlock a b
     | CollapsedBlock a (AtLeastOneOf (CursorBlock a b) b)
 
 
+getNodeCursorBlock : CursorBlock a b -> a
 getNodeCursorBlock block =
     case block of
         TerminalBlock a _ ->
@@ -65,6 +68,7 @@ getNodeCursorBlock block =
             a
 
 
+updateNodeCursorBlock : (a -> a) -> CursorBlock a b -> CursorBlock a b
 updateNodeCursorBlock f block =
     case block of
         TerminalBlock a bs ->
@@ -89,6 +93,7 @@ type Ctx a b
     | Down a (List (Collapsable a b)) (List (Collapsable a b)) (Ctx a b)
 
 
+mapCtx : (a -> c) -> (b -> d) -> Ctx a b -> Ctx c d
 mapCtx f g ctx =
     case ctx of
         Top ->
@@ -109,6 +114,7 @@ type BlockZipper a b
     = BlockZipper (Block a b) (Ctx a b)
 
 
+getNodeBlockZipper : BlockZipper a b -> a
 getNodeBlockZipper (BlockZipper block ctx) =
     getNodeBlock block
 
@@ -122,10 +128,12 @@ mapCursorZipper f g (CursorZipper block ctx) =
     CursorZipper (mapCursorBlock f g block) (mapCtx f g ctx)
 
 
+getNodeCursorZipper : CursorZipper a b -> a
 getNodeCursorZipper (CursorZipper block ctx) =
     getNodeCursorBlock block
 
 
+updateNodeCursorZipper : (a -> a) -> CursorZipper a b -> CursorZipper a b
 updateNodeCursorZipper f (CursorZipper block ctx) =
     CursorZipper (updateNodeCursorBlock f block) ctx
 
@@ -243,6 +251,9 @@ fullyCollapsed block =
                 Block <| CursorBlock <| fullyCollapsedInner ( bs, tr )
 
 
+translatedBlockToEither :
+    TranslatedBlock
+    -> Either ( Nonempty TranslatedBlock, String ) String
 translatedBlockToEither b =
     case b of
         L2Word w ->
@@ -280,6 +291,7 @@ fullyCollapse collapsable =
 -- HELPER
 
 
+fromCollapsable : Collapsable a b -> Either (Block a b) b
 fromCollapsable collapsable =
     case collapsable of
         Block block ->

@@ -5,6 +5,7 @@ module Routing
         , makePath
         )
 
+import Navigation
 import UrlParser as Url exposing (..)
 
 
@@ -21,6 +22,7 @@ type Route
     | Dashboard
 
 
+parsePath : Navigation.Location -> Maybe Route
 parsePath =
     Url.parseHash route
 
@@ -36,6 +38,7 @@ route =
         ]
 
 
+makePath : Route -> String
 makePath route =
     case route of
         Login ->

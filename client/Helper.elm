@@ -1,6 +1,5 @@
 module Helper exposing (..)
 
-import Lazy
 import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 
 
@@ -64,6 +63,13 @@ nonemptyfoldr nonempty tcons tnil (Nonempty x xs) =
     nonempty x (List.foldr tcons tnil xs)
 
 
+nonemptyFoldrFull : (a -> s -> s) -> (a -> t -> s) -> t -> Nonempty a -> s
+nonemptyFoldrFull scons revNonempty tnil xs =
+    case Nonempty.reverse xs of
+        Nonempty last xs ->
+            List.foldr scons (revNonempty last tnil) (List.reverse xs)
+
+
 nonemptyLast : Nonempty a -> a
 nonemptyLast =
     Nonempty.head << Nonempty.reverse
@@ -94,12 +100,10 @@ truncateAfter cond =
 
 
 
--- undefined : a
--- undefined =
---     Lazy.force <| Lazy.lazy <| \() -> Debug.crash "undefined"
 -- SCRAPS
 
 
+testurls : List String
 testurls =
     [ "https://upload.wikimedia.org/wikipedia/commons/4/4f/hu-ad%c3%b3.ogg"
     , "https://upload.wikimedia.org/wikipedia/commons/d/d3/hu-adni.ogg"

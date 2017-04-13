@@ -1,94 +1,162 @@
 module TransView exposing (view)
 
+import Model exposing (..)
 import Message exposing (..)
 import MyCss exposing (CssClass(..))
-import Overflow
 import Translation.Base exposing (..)
 import Translation.Cursor exposing (..)
 import Translation.Block exposing (..)
-import Translation.Leaf exposing (..)
-import Translation.StateTraverse
-import Parser exposing (..)
+import Translation.Helper exposing (..)
+import Helper
 import Either exposing (Either(..))
 import AtLeastOneOf exposing (AtLeastOneOf(..))
-import Helper
-import Helper.State as State exposing (State)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
-import Bootstrap.Button as Button
 import Html.CssHelpers
+import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 
 
 { id, class, classList } =
     Html.CssHelpers.withNamespace MyCss.storytown
 
 
-pop : State (List a) a
-pop =
-    State.get
-        |> State.andThen
-            (\cs ->
-                case cs of
-                    [] ->
-                        State.fail
+view : Int -> CollapsableLayout -> Html StoryMsg
+view idx colLayout =
+    case colLayout of
+        Raw rawCol ->
+            measureDiv idx rawCol
 
-                    c :: rem ->
-                        State.put rem
-                            |> State.discardAndThen
-                                (State.noMutate c)
-            )
+        Formatted col ->
+            splitCollapsable <|
+                registerCursors col
+
+        LayoutError e ->
+            -- [todo] handle more gracefully
+            Debug.crash ("layout error: " ++ toString e)
 
 
-foldLeaves :
-    List c
-    -> (b -> c -> d)
-    -> Collapsable a b
-    -> Maybe (Collapsable a d)
-foldLeaves cs f col =
+measureDiv : Int -> Collapsable a Word -> Html msg
+measureDiv idx =
     let
-        word : b -> State (List c) d
-        word b =
-            pop |> State.andThen (f b >> State.noMutate)
+        singleWordSpan w =
+            [ span [] [ text w ] ]
+
+        nontermBlock =
+            (\_ ->
+                List.concat
+                    << AtLeastOneOf.toList
+                    << AtLeastOneOf.map identity singleWordSpan
+            )
     in
-        Translation.StateTraverse.traverseLeaf
-            (mapCollapsable identity word col)
-            |> State.runState cs
-            |> Maybe.andThen
-                (\( col, rem ) ->
-                    if List.isEmpty rem then
-                        Just col
-                    else
-                        Nothing
+        div
+            [ Html.Attributes.id ("measureDiv" ++ toString idx)
+            , class [ MeasurementDiv ]
+            ]
+            << foldr
+                singleWordSpan
+                identity
+                identity
+                nontermBlock
+                (\_ ->
+                    List.concat
+                        << Nonempty.toList
+                        << Nonempty.map singleWordSpan
                 )
+                nontermBlock
 
 
-view : Collapsable String Word -> Html StoryMsg
-view col =
-    case foldLeaves [ 1, 2, 3, 4, 5, 6, 7 ] (,) col of
-        Nothing ->
-            text "error calculating widths"
+splitCollapsable :
+    Collapsable ( String, Maybe (CursorZipper String (Measured Word)) ) (Measured Word)
+    -> Html StoryMsg
+splitCollapsable =
+    let
+        expandedBlock :
+            ( String, Maybe (CursorZipper String (Measured Word)) )
+            -> AtLeastOneOf (Nonempty (Measured (Html StoryMsg))) (Measured Word)
+            -> Nonempty (Measured (Html StoryMsg))
+        expandedBlock trz =
+            Nonempty.map
+                (\hwis ->
+                    { content =
+                        genericBlockView trz
+                            (List.map .content <| Nonempty.toList hwis)
+                    , width =
+                        List.sum
+                            (List.map .width <| Nonempty.toList hwis)
+                    , isEnd = .isEnd (Helper.nonemptyLast hwis)
+                    }
+                )
+                << Helper.truncateAfter .isEnd
+                << Nonempty.concat
+                << AtLeastOneOf.toNonempty
+                << AtLeastOneOf.map identity
+                    (\w ->
+                        Nonempty.fromElement
+                            { w | content = wordView w.content }
+                    )
 
-        Just col ->
-            view1 (mapCollapsable identity toString col)
+        terminalBlock :
+            ( String, Maybe (CursorZipper String (Measured Word)) )
+            -> Nonempty (Measured Word)
+            -> Nonempty (Measured (Html StoryMsg))
+        terminalBlock trz =
+            Nonempty.map
+                (\twis ->
+                    { content =
+                        genericBlockView trz
+                            (List.map (wordView << .content) <|
+                                Nonempty.toList twis
+                            )
+                    , width =
+                        List.sum
+                            (List.map .width <| Nonempty.toList twis)
+                    , isEnd = .isEnd (Helper.nonemptyLast twis)
+                    }
+                )
+                << Helper.truncateAfter .isEnd
+
+        -- [note] identical to expandedBlock right now
+        collapsedBlock :
+            ( String, Maybe (CursorZipper String (Measured Word)) )
+            -> AtLeastOneOf (Nonempty (Measured (Html StoryMsg))) (Measured Word)
+            -> Nonempty (Measured (Html StoryMsg))
+        collapsedBlock trz =
+            Nonempty.map
+                (\hwis ->
+                    { content =
+                        genericBlockView trz
+                            (List.map .content <| Nonempty.toList hwis)
+                    , width =
+                        List.sum
+                            (List.map .width <| Nonempty.toList hwis)
+                    , isEnd = .isEnd (Helper.nonemptyLast hwis)
+                    }
+                )
+                << Helper.truncateAfter .isEnd
+                << Nonempty.concat
+                << AtLeastOneOf.toNonempty
+                << AtLeastOneOf.map identity
+                    (\w ->
+                        Nonempty.fromElement
+                            { w | content = wordView w.content }
+                    )
+    in
+        div [ class [ Table ] ]
+            << List.map (div [ class [ Row ] ] << List.singleton)
+            << foldr
+                (List.singleton << wordView << .content)
+                (Nonempty.toList << Nonempty.map .content)
+                identity
+                expandedBlock
+                terminalBlock
+                collapsedBlock
 
 
-
--- OLD
-
-
-view1 : Collapsable String Word -> Html StoryMsg
-view1 collapsable =
-    div [ class [ Table ] ]
-        [ collapsableView (initViewCollapsable collapsable)
-        ]
-
-
-initViewCollapsable :
-    Collapsable String Word
-    -> Collapsable ( String, Maybe (CursorZipper String Word) ) Word
-initViewCollapsable =
+registerCursors :
+    Collapsable a b
+    -> Collapsable ( a, Maybe (CursorZipper a b) ) b
+registerCursors =
     let
         register :
             CursorZipper ( a, Maybe (CursorZipper a b) ) b
@@ -115,51 +183,8 @@ initViewCollapsable =
             >> Either.fromEither LoneWord Block
 
 
-collapsableView :
-    Collapsable ( String, Maybe (CursorZipper String Word) ) Word
-    -> Html StoryMsg
-collapsableView collapsable =
-    case collapsable of
-        LoneWord w ->
-            wordView w
-
-        Block block ->
-            let
-                blockView block =
-                    case block of
-                        ExpandedBlock trz bs ->
-                            genericBlockView trz <|
-                                List.map collapsableView <|
-                                    AtLeastOneOf.toList <|
-                                        AtLeastOneOf.map
-                                            Block
-                                            LoneWord
-                                            bs
-
-                        CursorBlock cblock ->
-                            let
-                                cursorBlockView cblock =
-                                    case cblock of
-                                        TerminalBlock trz ws ->
-                                            genericBlockView trz <|
-                                                List.map wordView <|
-                                                    Nonempty.toList ws
-
-                                        CollapsedBlock trz bs ->
-                                            genericBlockView trz <|
-                                                AtLeastOneOf.toList <|
-                                                    AtLeastOneOf.map
-                                                        cursorBlockView
-                                                        wordView
-                                                        bs
-                            in
-                                cursorBlockView cblock
-            in
-                blockView block
-
-
 genericBlockView :
-    ( String, Maybe (CursorZipper String Word) )
+    ( String, Maybe (CursorZipper String (Measured Word)) )
     -> List (Html StoryMsg)
     -> Html StoryMsg
 genericBlockView ( tr, z ) childViews =
@@ -184,11 +209,13 @@ genericBlockView ( tr, z ) childViews =
         ]
 
 
+wordView : Word -> Html msg
 wordView w =
-    span [ class [ Cell, Orig ] ] [ text (w ++ " ") ]
+    span [ class [ Cell, Orig ] ] [ text w ]
 
 
 
+-- [todo] incorporate this function
 --  let
 --     txt =
 --         a
@@ -218,6 +245,7 @@ wordView w =
 --         txt
 
 
+addMin : Maybe a -> List CssClass -> List CssClass
 addMin z =
     case z of
         Nothing ->
@@ -227,6 +255,7 @@ addMin z =
             identity
 
 
+addHasExpand : Maybe (CursorZipper a b) -> List CssClass -> List CssClass
 addHasExpand z =
     case z |> Maybe.andThen expand of
         Nothing ->
@@ -236,6 +265,10 @@ addHasExpand z =
             (::) HasExpand
 
 
+addExpand :
+    Maybe (CursorZipper String (Measured Word))
+    -> List (Html StoryMsg)
+    -> List (Html StoryMsg)
 addExpand z =
     case z |> Maybe.andThen expand of
         Nothing ->
@@ -253,6 +286,10 @@ addExpand z =
                 )
 
 
+addCollapse :
+    Maybe (CursorZipper String (Measured Word))
+    -> List (Html StoryMsg)
+    -> List (Html StoryMsg)
 addCollapse z =
     case z |> Maybe.andThen collapse of
         Nothing ->

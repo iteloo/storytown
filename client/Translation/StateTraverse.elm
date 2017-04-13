@@ -8,6 +8,9 @@ import AtLeastOneOf exposing (AtLeastOneOf(..))
 import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 
 
+traverseAtLeastOneOf :
+    AtLeastOneOf (State s a) (State s b)
+    -> State s (AtLeastOneOf a b)
 traverseAtLeastOneOf =
     AtLeastOneOf.foldr
         (map3 AtLeastOneOf)
@@ -19,6 +22,7 @@ traverseAtLeastOneOf =
         (map Either.Right)
 
 
+traverseNonempty : Nonempty (State s a) -> State s (Nonempty a)
 traverseNonempty =
     Helper.nonemptyfoldr (map2 Nonempty) (map2 (::)) (noMutate [])
 

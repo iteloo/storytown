@@ -11,7 +11,6 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Dict
-import Regex exposing (Match)
 import RemoteData as RD
 import List.Nonempty as NList
 import Json.Encode as Enc
@@ -65,8 +64,8 @@ appView s =
 
                 StoryEditPage s ->
                     Html.map StoryEditMsg (storyEditView s)
-        , footer [ class [ Footer ] ]
-            [ div [ Html.Attributes.class "container" ] [ text (toString s) ] ]
+          -- , footer [ class [ Footer ] ]
+          --     [ div [ Html.Attributes.class "container" ] [ text (toString s) ] ]
         ]
 
 
@@ -137,6 +136,9 @@ dashboardView s =
             text "student dashboard"
 
 
+teacherDashboard :
+    { b | stories : Web (List ( Int, { a | title : String } )) }
+    -> Html msg
 teacherDashboard s =
     Grid.container []
         [ h2 [] [ text "Teacher Dashboard" ]
@@ -161,6 +163,7 @@ teacherDashboard s =
         ]
 
 
+storyItemView : ( StoryId, { a | title : String } ) -> ListGroup.CustomItem msg
 storyItemView ( storyId, story ) =
     ListGroup.anchor
         [ ListGroup.attrs
@@ -197,38 +200,12 @@ storyView s =
                 text "Cannot load..."
 
             RD.Success story ->
-                div [ class [ Table ] ] <|
+                div [] <|
                     Dict.values <|
                         Dict.map
-                            (\index item -> TransView.view item.collapsable)
+                            (\idx -> TransView.view idx << .collapsable)
                             story.sentences
         ]
-
-
-itemView { playbackState } index item =
-    div [ class [ Row ] ]
-        [ div [ class [ Cell ] ]
-            [ div [ class [ Table ] ]
-                [ div [ class [ Cell ] ]
-                    [ TransView.view item.collapsable ]
-                ]
-            , div [ Html.Attributes.id "testDiv" ] <|
-                List.map
-                    (span [] << List.singleton << text << .match)
-                <|
-                    Regex.find Regex.All
-                        (Regex.regex "\\w+\\s?|[^\\w\\s]\\s?")
-                        loremIpsum
-            ]
-        ]
-
-
-loremIpsum =
-    "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum"
-
-
-
--- STORY EDIT VIEW
 
 
 storyEditView : StoryEditModel -> Html StoryEditMsg
@@ -310,6 +287,11 @@ storyEditView s =
                     ]
 
 
+itemEditView :
+    { a | recordingId : Maybe ItemId }
+    -> ItemId
+    -> { b | audioUrl : Maybe String, text : String }
+    -> Html StoryEditMsg
 itemEditView { recordingId } index item =
     div [ class [ Row ] ]
         [ div [ class [ Cell ] ]
@@ -385,6 +367,7 @@ transView tb =
 -- PLAYBACK
 
 
+playbackView : { a | playbackState : PlaybackState } -> Html StoryMsg
 playbackView { playbackState } =
     let
         disableWhenNotPlayingOrPaused =
@@ -424,7 +407,3 @@ playbackView { playbackState } =
                 ]
                 [ text ">>" ]
             ]
-
-
-snd ( _, b ) =
-    b

@@ -57,6 +57,7 @@ discardAndThen =
     (<<) (andThen f)
 
 
+(>>>) : (a -> State s b) -> (b -> State s c) -> a -> State s c
 (>>>) =
     flip (<<<)
 

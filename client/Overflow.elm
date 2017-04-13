@@ -9,13 +9,7 @@ type alias Measurement =
     List { top : Float, width : Float }
 
 
-port checkOverflow : Id -> Cmd msg
+port measureLineWrap : ( Int, Id ) -> Cmd msg
 
 
-port overflow : (Id -> msg) -> Sub msg
-
-
-port measureLineWrap : Id -> Cmd msg
-
-
-port lineWrapMeasured : (Measurement -> msg) -> Sub msg
+port lineWrapMeasured : (( Int, Measurement ) -> msg) -> Sub msg

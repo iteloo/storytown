@@ -6,11 +6,8 @@ and each collapsed subtree is fully collapsed.
 
 import Translation.Base exposing (..)
 import Translation.Block exposing (..)
-import Parser exposing (TranslatedBlock(..))
 import Either exposing (Either(..))
 import AtLeastOneOf exposing (AtLeastOneOf(..))
-import Helper
-import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 
 
 underlyingCollapsable : CursorZipper a b -> Collapsable a b
@@ -88,5 +85,6 @@ rightBottom =
     toBlockZipper >> upTilRightExists >> Maybe.map bottom
 
 
+toBlockZipper : CursorZipper a b -> BlockZipper a b
 toBlockZipper (CursorZipper bottom ctx) =
     BlockZipper (CursorBlock bottom) ctx

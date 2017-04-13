@@ -9,6 +9,7 @@ import Api
 import Audio
 import MediaRecorder as MR
 import Translation.Base as Trans
+import Translation.Helper as Trans
 import Parser
 import Overflow
 import Helper
@@ -63,6 +64,7 @@ initDashboard user =
           ]
 
 
+subs : { a | app : AppModel } -> Sub Msg
 subs s =
     Sub.batch <|
         [ Audio.onStateChange
@@ -82,7 +84,7 @@ subs s =
                                 (ReadyMsg
                                     << PageMsg
                                     << StoryMsg
-                                    << LineWrapMeasured
+                                    << uncurry LineWrapMeasured
                                 )
                             ]
 
@@ -246,33 +248,17 @@ updateStoryPage { toMsg } message s =
         -- SERVER
         StoryReceived story ->
             let
-                loadAudio s =
-                    s
-                        ! (RD.toMaybe s.story
-                            |> Maybe.andThen
-                                (.sentences
-                                    >> Dict.map
-                                        (\idx i ->
-                                            i.audioUrl
-                                                |> Maybe.map (flip (,) idx)
-                                        )
-                                    >> Dict.values
-                                    >> Helper.sequenceMaybe
-                                )
-                            |> Maybe.map Audio.load
-                            |> Helper.maybeToList
-                          )
-
                 itemToSentence { text, audioUrl } =
-                    { collapsable =
-                        case Parser.parseTranslatedText text of
-                            Ok r ->
-                                Trans.fullyCollapsed r
+                    (case Parser.parseTranslatedText text of
+                        Ok r ->
+                            { collapsable = Raw (Trans.fullyCollapsed r)
+                            , audioUrl = audioUrl
+                            }
 
-                            Err e ->
-                                Debug.crash e
-                    , audioUrl = audioUrl
-                    }
+                        Err e ->
+                            -- [todo] handle gracefully
+                            Debug.crash "cannot parse into translation"
+                    )
             in
                 { s
                     | story =
@@ -290,7 +276,6 @@ updateStoryPage { toMsg } message s =
                             story
                 }
                     ! []
-                    :> loadAudio
 
         -- PLAYBACK
         PlayButton ->
@@ -314,7 +299,7 @@ updateStoryPage { toMsg } message s =
             s ! [ Audio.fastforward () ]
 
         AudioStarted runit ->
-            -- [problem] doesn't handle error
+            -- [todo] handle error
             s ! []
 
         Rewinded runit ->
@@ -365,7 +350,7 @@ updateStoryPage { toMsg } message s =
                     0
                     (Maybe.map
                         (\{ collapsable, audioUrl } ->
-                            { collapsable = new
+                            { collapsable = Formatted new
                             , audioUrl = audioUrl
                             }
                         )
@@ -374,28 +359,92 @@ updateStoryPage { toMsg } message s =
                 s
 
         AnimationFrame _ ->
-            s ! [ Overflow.measureLineWrap "testDiv" ]
+            let
+                -- [todo] add a Formatting state
+                ( _, cmd ) =
+                    RD.update
+                        (\story ->
+                            ()
+                                ! (Dict.map
+                                    (\idx item ->
+                                        case item.collapsable of
+                                            Raw _ ->
+                                                [ Overflow.measureLineWrap
+                                                    ( idx
+                                                    , "measureDiv"
+                                                        ++ toString idx
+                                                    )
+                                                ]
 
-        LineWrapMeasured measurement ->
-            s
-                ! Debug.log
-                    (toString <|
-                        List.foldr
-                            (\sp lines ->
-                                case lines of
-                                    [] ->
-                                        [ ( [ sp.width ], sp.top ) ]
+                                            _ ->
+                                                []
+                                    )
+                                    story.sentences
+                                    |> Dict.values
+                                    |> List.concat
+                                  )
+                        )
+                        s.story
+            in
+                s ! [ cmd ]
 
-                                    ( sps, top ) :: rest ->
-                                        if sp.top == top then
-                                            ( sp.width :: sps, top ) :: rest
-                                        else
-                                            ( [ sp.width ], sp.top ) :: lines
+        LineWrapMeasured idx measurement ->
+            let
+                loadAudio s =
+                    s
+                        ! (RD.toMaybe s.story
+                            |> Maybe.andThen
+                                (.sentences
+                                    >> Dict.map
+                                        (\idx i ->
+                                            i.audioUrl
+                                                |> Maybe.map (flip (,) idx)
+                                        )
+                                    >> Dict.values
+                                    >> Helper.sequenceMaybe
+                                )
+                            |> Maybe.map Audio.load
+                            |> Helper.maybeToList
+                          )
+            in
+                -- [todo] change this to measure the concatenation of items
+                updateSentences
+                    (Dict.update idx
+                        (Maybe.map
+                            (\item ->
+                                { item
+                                    | collapsable =
+                                        case item.collapsable of
+                                            Raw rawCol ->
+                                                Trans.foldLeaves
+                                                    (Trans.markLinebreaks
+                                                        measurement
+                                                    )
+                                                    (\w { width, isEnd } ->
+                                                        { content = w
+                                                        , width = width
+                                                        , isEnd = isEnd
+                                                        }
+                                                    )
+                                                    rawCol
+                                                    |> Maybe.map Formatted
+                                                    |> Maybe.withDefault
+                                                        (LayoutError
+                                                            CannotZipWidths
+                                                        )
+
+                                            x ->
+                                                -- [todo] think about this more
+                                                x
+                                }
                             )
-                            []
-                            measurement
+                        )
                     )
-                    []
+                    s
+                    -- [problem] can load once all url are here, but should
+                    --           only allow playback when all items formatted
+                    :>
+                        loadAudio
 
 
 updateStoryEdit :
@@ -661,7 +710,6 @@ routeChange route app =
                                                 << StoryReceived
                                             )
                                             (Api.getApiStoryById storyid)
-                                      , Overflow.checkOverflow "testId"
                                       ]
 
                 Routing.StoryNew ->
@@ -757,6 +805,7 @@ user app =
 -- ERROR
 
 
+error : a -> { c | error : b } -> ( { c | error : Maybe a }, Cmd msg )
 error msg s =
     { s | error = Just msg } ! []
 
@@ -765,14 +814,23 @@ error msg s =
 -- HELPERS
 
 
+badMsgState : msg -> model -> ( model, Cmd msg2 )
 badMsgState msg s =
     Debug.log "bad msg-state combo!" ( msg, s ) |> \_ -> s ! []
 
 
+updateStory :
+    (a -> b)
+    -> { s | story : Web a }
+    -> ( { s | story : Web b }, Cmd msg )
 updateStory f s =
     { s | story = RD.map f s.story } ! []
 
 
+updateSentences :
+    (a -> b)
+    -> { s | story : Web { c | sentences : a } }
+    -> ( { s | story : Web { c | sentences : b } }, Cmd msg )
 updateSentences f s =
     updateStory (\sty -> { sty | sentences = f sty.sentences }) s
 

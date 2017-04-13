@@ -4,10 +4,9 @@ import Model exposing (..)
 import Api
 import MediaRecorder as MR
 import Navigation as Nav
-import RemoteData as RD
 import Translation.Base as Trans
+import Translation.Helper as Trans
 import Overflow
-import Http
 import Time
 import Bootstrap.Navbar as Navbar
 
@@ -66,9 +65,9 @@ type StoryMsg
     | PlaybackStateChanged PlaybackState
     | NextSentence Int
       -- LAYOUT
-    | CollapsableChange (Trans.Collapsable String Trans.Word)
+    | CollapsableChange (Trans.Collapsable String (Trans.Measured Trans.Word))
     | AnimationFrame Time.Time
-    | LineWrapMeasured Overflow.Measurement
+    | LineWrapMeasured Int Overflow.Measurement
 
 
 type StoryEditMsg

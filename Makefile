@@ -6,14 +6,19 @@ build: client-build server-build
 
 install: client-build server-install
 
-install-and-start:
-	rm -rf assets/main.js assets/style.css && make install && heroku local
+install-debug: client-build-debug server-install
+
+install-and-debug:
+	rm -rf assets/main.js assets/style.css && make install-debug && heroku local
 
 client-setup:
 	(cd client ; elm package install -y)
 
 client-build:
 	(cd client ; make)
+
+client-build-debug:
+	(cd client ; make debug)
 
 server-setup:
 	stack setup

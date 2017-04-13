@@ -2,7 +2,6 @@ port module Audio exposing (..)
 
 import Model exposing (PlaybackState(..), PlaybackItemState, ItemId)
 import Json.Decode as D
-import List.Zipper exposing (Zipper(..))
 import Time
 
 
@@ -83,5 +82,6 @@ itemStateDecoder =
         (D.field "end" timeDecoder)
 
 
+timeDecoder : D.Decoder Float
 timeDecoder =
     D.map ((*) Time.second) D.float

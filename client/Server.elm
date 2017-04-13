@@ -74,5 +74,6 @@ handleHttpError tag tagE r =
                     Maybe.withDefault showError tagE e
 
 
+showError : a -> Msg
 showError =
     Error << toString

@@ -33,6 +33,7 @@ sendW tag =
         )
 
 
+putObject : String -> MR.Blob -> Http.Request ()
 putObject reqUrl blob =
     Http.request
         { method = "PUT"
@@ -45,6 +46,7 @@ putObject reqUrl blob =
         }
 
 
+baseUrlFromSignedUrl : String -> String
 baseUrlFromSignedUrl url =
     case List.head (String.split "?" url) of
         Nothing ->
@@ -68,5 +70,6 @@ handleHttpError tag tagE r =
             showError e
 
 
+showError : a -> Msg
 showError =
     Error << toString

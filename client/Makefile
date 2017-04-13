@@ -1,10 +1,15 @@
+ELM_MAKE_FLAGS =
+
 all: ../assets/style.css ../assets/main.js
 
 ../assets/style.css: Stylesheets.elm
 	elm-css Stylesheets.elm
 
 ../assets/main.js: Api.elm Main.elm .
-	elm make Main.elm --output ../assets/main.js
+	elm make $(ELM_MAKE_FLAGS) Main.elm --output ../assets/main.js
+
+debug: ELM_MAKE_FLAGS += --debug --warn
+debug: all
 
 run-tests: tests.js
 	node tests.js

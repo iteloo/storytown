@@ -4,7 +4,6 @@ import Translation.Base exposing (..)
 import Either exposing (Either(..))
 import AtLeastOneOf exposing (AtLeastOneOf(..))
 import Helper
-import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 
 
 initTop : Block a b -> BlockZipper a b
