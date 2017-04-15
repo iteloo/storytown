@@ -5,6 +5,7 @@ import Css.Elements exposing (html, body)
 import Css.Namespace exposing (namespace)
 
 
+storytown : String
 storytown =
     "storytown"
 
@@ -16,6 +17,9 @@ type CssClass
     | Row
     | Cell
     | Orig
+    | FakeTable
+    | FakeRow
+    | FakeCell
     | MeasurementDiv
     | SidePadding
     | Padding
@@ -27,11 +31,12 @@ type CssClass
     | Collapse
 
 
+css : Stylesheet
 css =
     (stylesheet << namespace storytown) <|
         let
             origFontSize =
-                pt 36
+                pt 24
 
             expandCollapse =
                 let
@@ -77,13 +82,21 @@ css =
             , class Cell
                 [ display tableCell
                 , textAlign center
-                , withClass Orig
-                    [ fontSize origFontSize
-                    , property "white-space" "pre"
-                    ]
+                ]
+            , class FakeTable
+                [ whiteSpace noWrap ]
+            , class FakeRow
+                []
+            , class FakeCell
+                [ display inlineBlock ]
+            , class Orig
+                [ fontSize origFontSize
+                , property "white-space" "pre"
+                , textAlign left
                 ]
             , class MeasurementDiv
                 [ fontSize origFontSize
+                , textAlign left
                 ]
             , class SidePadding
                 [ paddingLeft (pt 2)

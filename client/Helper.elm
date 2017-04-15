@@ -84,28 +84,32 @@ nonemptyLast =
     Nonempty.head << Nonempty.reverse
 
 
+truncateListAfter : (a -> Bool) -> List a -> List (Nonempty a)
+truncateListAfter cond =
+    List.foldr (mkCons cond (::)) []
+
+
 truncateAfter : (a -> Bool) -> Nonempty a -> Nonempty (Nonempty a)
 truncateAfter cond =
-    let
-        mkCons :
-            (Nonempty a -> List (Nonempty a) -> s)
-            -> a
-            -> List (Nonempty a)
-            -> s
-        mkCons cons =
-            (\a segs ->
-                if cond a then
-                    cons (Nonempty.fromElement a) segs
-                else
-                    case segs of
-                        [] ->
-                            cons (Nonempty.fromElement a) []
+    nonemptyfoldr (mkCons cond Nonempty) (mkCons cond (::)) []
 
-                        x :: xs ->
-                            cons (a ::: x) xs
-            )
-    in
-        nonemptyfoldr (mkCons Nonempty) (mkCons (::)) []
+
+mkCons :
+    (a -> Bool)
+    -> (Nonempty a -> List (Nonempty a) -> s)
+    -> a
+    -> List (Nonempty a)
+    -> s
+mkCons cond cons a segs =
+    if cond a then
+        cons (Nonempty.fromElement a) segs
+    else
+        case segs of
+            [] ->
+                cons (Nonempty.fromElement a) []
+
+            x :: xs ->
+                cons (a ::: x) xs
 
 
 

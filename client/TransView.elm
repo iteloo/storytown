@@ -1,6 +1,5 @@
 module TransView exposing (view)
 
-import Model exposing (..)
 import Message exposing (..)
 import MyCss exposing (CssClass(..))
 import Translation.Base exposing (..)
@@ -14,6 +13,8 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.CssHelpers
+import Dict
+import Css
 import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 
 
@@ -21,100 +22,112 @@ import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
     Html.CssHelpers.withNamespace MyCss.storytown
 
 
-view : Int -> CollapsableLayout -> Html StoryMsg
-view idx colLayout =
-    case colLayout of
-        Raw rawCol ->
-            measureDiv idx rawCol
+styles : List Css.Mixin -> Attribute msg
+styles =
+    Css.asPairs >> Html.Attributes.style
 
-        Formatted col ->
-            splitCollapsable <|
-                registerCursors col
+
+view : Int -> ParagraphLayout -> Html StoryMsg
+view idx layout =
+    case layout of
+        Raw raw ->
+            measureDiv idx raw
+
+        Formatted para ->
+            para
+                |> Dict.map
+                    (\_ i ->
+                        { i | collapsable = registerCursors i.collapsable }
+                    )
+                |> splitParagraph
 
         LayoutError e ->
             -- [todo] handle more gracefully
             Debug.crash ("layout error: " ++ toString e)
 
 
-measureDiv : Int -> Collapsable a Word -> Html msg
-measureDiv idx =
+measureDiv : Int -> Paragraph a Word -> Html msg
+measureDiv _ =
+    -- [note] unused first arg
     let
         singleWordSpan w =
             [ span [] [ text w ] ]
 
-        nontermBlock =
-            (\_ ->
-                List.concat
-                    << AtLeastOneOf.toList
-                    << AtLeastOneOf.map identity singleWordSpan
-            )
+        nontermBlock _ =
+            List.concat
+                << AtLeastOneOf.toList
+                << AtLeastOneOf.map identity singleWordSpan
     in
         div
-            [ Html.Attributes.id ("measureDiv" ++ toString idx)
+            [ Html.Attributes.id "measureDiv0"
             , class [ MeasurementDiv ]
             ]
-            << foldr
-                singleWordSpan
-                identity
-                identity
-                nontermBlock
-                (\_ ->
-                    List.concat
-                        << Nonempty.toList
-                        << Nonempty.map singleWordSpan
+            << List.concatMap
+                (foldr
+                    singleWordSpan
+                    identity
+                    identity
+                    nontermBlock
+                    (\_ ->
+                        List.concat
+                            << Nonempty.toList
+                            << Nonempty.map singleWordSpan
+                    )
+                    nontermBlock
+                    << .collapsable
                 )
-                nontermBlock
+            << Dict.values
 
 
-splitCollapsable :
-    Collapsable ( String, Maybe (CursorZipper String (Measured Word)) ) (Measured Word)
+splitParagraph :
+    Paragraph ( String, Maybe (CursorZipper String (Measured Word)) ) (Measured Word)
     -> Html StoryMsg
-splitCollapsable =
+splitParagraph =
     let
+        wordView : Measured Word -> Nonempty (Measured (Html msg))
+        wordView w =
+            Nonempty.fromElement <|
+                { w
+                    | content =
+                        span
+                            [ class [ FakeCell, Orig ]
+                            , styles [ Css.width (Css.px w.width) ]
+                            ]
+                            [ text w.content ]
+                }
+
+        mkBlock trz mbs =
+            let
+                width =
+                    List.sum (List.map .width <| Nonempty.toList mbs)
+            in
+                { content =
+                    genericBlockView trz
+                        width
+                        (List.map .content <| Nonempty.toList <| mbs)
+                , width = width
+                , isEnd = .isEnd (Helper.nonemptyLast mbs)
+                }
+
         expandedBlock :
             ( String, Maybe (CursorZipper String (Measured Word)) )
             -> AtLeastOneOf (Nonempty (Measured (Html StoryMsg))) (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
         expandedBlock trz =
-            Nonempty.map
-                (\hwis ->
-                    { content =
-                        genericBlockView trz
-                            (List.map .content <| Nonempty.toList hwis)
-                    , width =
-                        List.sum
-                            (List.map .width <| Nonempty.toList hwis)
-                    , isEnd = .isEnd (Helper.nonemptyLast hwis)
-                    }
-                )
+            Nonempty.map (mkBlock trz)
                 << Helper.truncateAfter .isEnd
                 << Nonempty.concat
                 << AtLeastOneOf.toNonempty
-                << AtLeastOneOf.map identity
-                    (\w ->
-                        Nonempty.fromElement
-                            { w | content = wordView w.content }
-                    )
+                << AtLeastOneOf.map identity wordView
 
         terminalBlock :
             ( String, Maybe (CursorZipper String (Measured Word)) )
             -> Nonempty (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
         terminalBlock trz =
-            Nonempty.map
-                (\twis ->
-                    { content =
-                        genericBlockView trz
-                            (List.map (wordView << .content) <|
-                                Nonempty.toList twis
-                            )
-                    , width =
-                        List.sum
-                            (List.map .width <| Nonempty.toList twis)
-                    , isEnd = .isEnd (Helper.nonemptyLast twis)
-                    }
-                )
+            Nonempty.map (mkBlock trz)
                 << Helper.truncateAfter .isEnd
+                << Nonempty.concatMap wordView
 
         -- [note] identical to expandedBlock right now
         collapsedBlock :
@@ -122,35 +135,31 @@ splitCollapsable =
             -> AtLeastOneOf (Nonempty (Measured (Html StoryMsg))) (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
         collapsedBlock trz =
-            Nonempty.map
-                (\hwis ->
-                    { content =
-                        genericBlockView trz
-                            (List.map .content <| Nonempty.toList hwis)
-                    , width =
-                        List.sum
-                            (List.map .width <| Nonempty.toList hwis)
-                    , isEnd = .isEnd (Helper.nonemptyLast hwis)
-                    }
-                )
+            Nonempty.map (mkBlock trz)
                 << Helper.truncateAfter .isEnd
                 << Nonempty.concat
                 << AtLeastOneOf.toNonempty
-                << AtLeastOneOf.map identity
-                    (\w ->
-                        Nonempty.fromElement
-                            { w | content = wordView w.content }
-                    )
+                << AtLeastOneOf.map identity wordView
     in
-        div [ class [ Table ] ]
-            << List.map (div [ class [ Row ] ] << List.singleton)
-            << foldr
-                (List.singleton << wordView << .content)
-                (Nonempty.toList << Nonempty.map .content)
-                identity
-                expandedBlock
-                terminalBlock
-                collapsedBlock
+        div [ class [ FakeTable ] ]
+            << List.map
+                (div [ class [ FakeRow ] ]
+                    << Nonempty.toList
+                    << Nonempty.map .content
+                )
+            << Helper.truncateListAfter .isEnd
+            << List.concatMap
+                (Nonempty.toList
+                    << foldr
+                        wordView
+                        identity
+                        identity
+                        expandedBlock
+                        terminalBlock
+                        collapsedBlock
+                    << .collapsable
+                )
+            << Dict.values
 
 
 {-| [todo] move this into the main view code to avoid using Maybe
@@ -165,8 +174,8 @@ registerCursors =
             -> CursorZipper ( a, Maybe (CursorZipper a b) ) b
         register z =
             updateNodeCursorZipper
-                (\( a, _ ) ->
-                    ( a, Just (mapCursorZipper (\( a, _ ) -> a) identity z) )
+                (Tuple.mapSecond
+                    (always (Just (mapCursorZipper Tuple.first identity z)))
                 )
                 z
     in
@@ -187,33 +196,40 @@ registerCursors =
 
 genericBlockView :
     ( String, Maybe (CursorZipper String (Measured Word)) )
+    -> Float
     -> List (Html StoryMsg)
     -> Html StoryMsg
-genericBlockView ( tr, z ) childViews =
-    div [ class [ Cell ] ]
-        [ div [ class [ Row ] ]
-            [ div [] childViews ]
-        , div [ class [ SidePadding ] ]
-            [ div
-                [ class <|
-                    addHasExpand z <|
-                        addMin z [ Hoverarea ]
-                ]
-              <|
-                addCollapse z <|
-                    addExpand z <|
-                        [ div [ class [ Padding ] ]
-                            [ div [ class [ Trans ] ]
-                                [ text tr ]
+genericBlockView ( tr, z ) width childViews =
+    div
+        [ class [ FakeCell ]
+        , styles [ Css.width (Css.px width) ]
+        ]
+        [ div [ class [ FakeRow ] ] <|
+            List.concat
+                [ [ div [] childViews ]
+                , case z of
+                    Nothing ->
+                        []
+
+                    Just _ ->
+                        [ div [ class [ SidePadding ] ]
+                            [ div
+                                [ class <|
+                                    addHasExpand z <|
+                                        addMin z [ Hoverarea ]
+                                ]
+                              <|
+                                addCollapse z <|
+                                    addExpand z <|
+                                        [ div [ class [ Padding ] ]
+                                            [ div [ class [ Trans ] ]
+                                                [ text tr ]
+                                            ]
+                                        ]
                             ]
                         ]
-            ]
+                ]
         ]
-
-
-wordView : Word -> Html msg
-wordView w =
-    span [ class [ Cell, Orig ] ] [ text w ]
 
 
 

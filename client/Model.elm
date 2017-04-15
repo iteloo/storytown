@@ -80,27 +80,8 @@ type alias StoryModel =
 
 type alias StoryState =
     { title : String
-    , sentences :
-        Dict.Dict Int
-            { collapsable : CollapsableLayout
-            , audioUrl : Maybe String
-            }
+    , sentences : Trans.ParagraphLayout
     }
-
-
-type alias CollapsableLayout =
-    -- [todo] clean up namespace
-    Layout (Trans.Collapsable String Trans.Word) (Trans.Collapsable String (Trans.Measured Trans.Word)) CollapsableLayoutError
-
-
-type Layout a b e
-    = Raw a
-    | Formatted b
-    | LayoutError e
-
-
-type CollapsableLayoutError
-    = CannotZipWidths
 
 
 initStory : User -> StoryModel

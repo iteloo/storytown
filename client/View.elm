@@ -200,11 +200,7 @@ storyView s =
                 text "Cannot load..."
 
             RD.Success story ->
-                div [] <|
-                    Dict.values <|
-                        Dict.map
-                            (\idx -> TransView.view idx << .collapsable)
-                            story.sentences
+                TransView.view 0 story.sentences
         ]
 
 

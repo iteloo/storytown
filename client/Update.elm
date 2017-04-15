@@ -251,7 +251,7 @@ updateStoryPage { toMsg } message s =
                 itemToSentence { text, audioUrl } =
                     (case Parser.parseTranslatedText text of
                         Ok r ->
-                            { collapsable = Raw (Trans.fullyCollapsed r)
+                            { collapsable = Trans.fullyCollapsed r
                             , audioUrl = audioUrl
                             }
 
@@ -266,11 +266,12 @@ updateStoryPage { toMsg } message s =
                             (\sty ->
                                 { title = sty.title
                                 , sentences =
-                                    Dict.fromList <|
-                                        List.indexedMap (,) <|
-                                            List.map
-                                                itemToSentence
-                                                sty.sentences
+                                    Trans.Raw <|
+                                        Dict.fromList <|
+                                            List.indexedMap (,) <|
+                                                List.map
+                                                    itemToSentence
+                                                    sty.sentences
                                 }
                             )
                             story
@@ -346,15 +347,19 @@ updateStoryPage { toMsg } message s =
         -- LAYOUT
         CollapsableChange new ->
             updateSentences
-                (Dict.update
-                    0
-                    (Maybe.map
-                        (\{ collapsable, audioUrl } ->
-                            { collapsable = Formatted new
-                            , audioUrl = audioUrl
-                            }
-                        )
-                    )
+                (\para ->
+                    case para of
+                        Trans.Formatted para ->
+                            Trans.Formatted <|
+                                Dict.update 0
+                                    (Maybe.map
+                                        (\sen -> { sen | collapsable = new })
+                                    )
+                                    para
+
+                        _ ->
+                            -- [todo] handle more gracefully
+                            Debug.crash "impossibru!"
                 )
                 s
 
@@ -365,24 +370,16 @@ updateStoryPage { toMsg } message s =
                     RD.update
                         (\story ->
                             ()
-                                ! (Dict.map
-                                    (\idx item ->
-                                        case item.collapsable of
-                                            Raw _ ->
-                                                [ Overflow.measureLineWrap
-                                                    ( idx
-                                                    , "measureDiv"
-                                                        ++ toString idx
-                                                    )
-                                                ]
+                                ! case story.sentences of
+                                    Trans.Raw _ ->
+                                        [ Overflow.measureLineWrap
+                                            -- [todo] use this to handle
+                                            --        multi-paragraph
+                                            ( 0, "measureDiv0" )
+                                        ]
 
-                                            _ ->
-                                                []
-                                    )
-                                    story.sentences
-                                    |> Dict.values
-                                    |> List.concat
-                                  )
+                                    _ ->
+                                        []
                         )
                         s.story
             in
@@ -394,14 +391,20 @@ updateStoryPage { toMsg } message s =
                     s
                         ! (RD.toMaybe s.story
                             |> Maybe.andThen
-                                (.sentences
-                                    >> Dict.map
-                                        (\idx i ->
-                                            i.audioUrl
-                                                |> Maybe.map (flip (,) idx)
-                                        )
-                                    >> Dict.values
-                                    >> Helper.sequenceMaybe
+                                (\story ->
+                                    case story.sentences of
+                                        Trans.Formatted para ->
+                                            Dict.map
+                                                (\idx i ->
+                                                    i.audioUrl
+                                                        |> Maybe.map (flip (,) idx)
+                                                )
+                                                para
+                                                |> Dict.values
+                                                |> Helper.sequenceMaybe
+
+                                        _ ->
+                                            Nothing
                                 )
                             |> Maybe.map Audio.load
                             |> Helper.maybeToList
@@ -409,28 +412,21 @@ updateStoryPage { toMsg } message s =
             in
                 -- [todo] change this to measure the concatenation of items
                 updateSentences
-                    (Dict.update idx
-                        (Maybe.map
-                            (\item ->
-                                { item
-                                    | collapsable =
-                                        case item.collapsable of
-                                            Raw rawCol ->
-                                                Trans.markLeaves
-                                                    measurement
-                                                    rawCol
-                                                    |> Maybe.map Formatted
-                                                    |> Maybe.withDefault
-                                                        (LayoutError
-                                                            CannotZipWidths
-                                                        )
+                    (\para ->
+                        case para of
+                            Trans.Raw para ->
+                                Trans.markLeaves
+                                    measurement
+                                    para
+                                    |> Maybe.map Trans.Formatted
+                                    |> Maybe.withDefault
+                                        (Trans.LayoutError
+                                            Trans.CannotZipWidths
+                                        )
 
-                                            x ->
-                                                -- [todo] think about this more
-                                                x
-                                }
-                            )
-                        )
+                            x ->
+                                -- [todo] think about this more
+                                x
                     )
                     s
                     -- [problem] can load once all url are here, but should

@@ -1,6 +1,10 @@
 module Translation.Layout
     exposing
-        ( Measurement
+        ( Paragraph
+        , ParagraphLayout
+        , Layout(..)
+        , ParagraphLayoutError(..)
+        , Measurement
         , Measured
         , markLeaves
         )
@@ -8,7 +12,32 @@ module Translation.Layout
 import Translation.Base exposing (..)
 import Translation.StateTraverse
 import Helper.State as State exposing (State)
+import Dict
 import List.Nonempty as Nonempty exposing ((:::))
+
+
+type alias Paragraph a b =
+    -- [note] we use a dictionary to sync with audio
+    -- [note] be careful if we end up using this with delete and add buttons
+    Dict.Dict Int
+        { collapsable : Collapsable a b
+        , audioUrl : Maybe String
+        }
+
+
+type alias ParagraphLayout =
+    -- [todo] clean up namespace
+    Layout (Paragraph String Word) (Paragraph String (Measured Word)) ParagraphLayoutError
+
+
+type Layout a b e
+    = Raw a
+    | Formatted b
+    | LayoutError e
+
+
+type ParagraphLayoutError
+    = CannotZipWidths
 
 
 type alias Measurement =
@@ -24,8 +53,8 @@ type alias Measured a =
 
 markLeaves :
     Measurement
-    -> Collapsable a b
-    -> Maybe (Collapsable a (Measured b))
+    -> Paragraph a b
+    -> Maybe (Paragraph a (Measured b))
 markLeaves measurement =
     zipLeaves
         (markLinebreaks measurement)
@@ -66,21 +95,28 @@ markLinebreaks =
 zipLeaves :
     List c
     -> (b -> c -> d)
-    -> Collapsable a b
-    -> Maybe (Collapsable a d)
-zipLeaves cs f col =
+    -> Paragraph a b
+    -> Maybe (Paragraph a d)
+zipLeaves cs f =
     let
         word : b -> State (List c) d
         word b =
             pop |> State.andThen (f b >> State.noMutate)
     in
-        Translation.StateTraverse.traverseLeaf
-            (mapCollapsable identity word col)
-            |> State.runState cs
-            |> Maybe.andThen
-                (\( col, rem ) ->
+        Dict.map
+            (\_ i ->
+                i.collapsable
+                    |> mapCollapsable identity word
+                    |> Translation.StateTraverse.traverseLeaf
+                    |> State.map (\col -> { i | collapsable = col })
+            )
+            >> Dict.foldr (State.map2 << Dict.insert)
+                (State.noMutate Dict.empty)
+            >> State.runState cs
+            >> Maybe.andThen
+                (\( para, rem ) ->
                     if List.isEmpty rem then
-                        Just col
+                        Just para
                     else
                         Nothing
                 )
