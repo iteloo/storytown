@@ -54,8 +54,8 @@ bottom (BlockZipper focus ctx) =
             bottom <|
                 BlockZipper block
                     (Down tr
-                        (List.map LoneWord before)
-                        (List.map (Either.fromEither Block LoneWord) after)
+                        (List.map LoneLeaf before)
+                        (List.map (Either.fromEither Block LoneLeaf) after)
                         ctx
                     )
 

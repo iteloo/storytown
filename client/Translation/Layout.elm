@@ -1,9 +1,18 @@
-module Translation.Helper exposing (..)
+module Translation.Layout
+    exposing
+        ( Measurement
+        , Measured
+        , markLeaves
+        )
 
 import Translation.Base exposing (..)
 import Translation.StateTraverse
 import Helper.State as State exposing (State)
 import List.Nonempty as Nonempty exposing ((:::))
+
+
+type alias Measurement =
+    List { top : Float, width : Float }
 
 
 type alias Measured a =
@@ -13,26 +22,22 @@ type alias Measured a =
     }
 
 
-splitLines : List { c | top : b, width : a } -> List ( List a, b )
-splitLines =
-    List.foldr
-        (\sp lines ->
-            case lines of
-                [] ->
-                    [ ( [ sp.width ], sp.top ) ]
-
-                ( sps, top ) :: rest ->
-                    if sp.top == top then
-                        ( sp.width :: sps, top ) :: rest
-                    else
-                        ( [ sp.width ], sp.top ) :: lines
+markLeaves :
+    Measurement
+    -> Collapsable a b
+    -> Maybe (Collapsable a (Measured b))
+markLeaves measurement =
+    zipLeaves
+        (markLinebreaks measurement)
+        (\w { width, isEnd } ->
+            { content = w
+            , width = width
+            , isEnd = isEnd
+            }
         )
-        []
 
 
-markLinebreaks :
-    List { width : Float, top : Float }
-    -> List { width : Float, isEnd : Bool }
+markLinebreaks : Measurement -> List { width : Float, isEnd : Bool }
 markLinebreaks =
     let
         mkEnd width =
@@ -58,12 +63,12 @@ markLinebreaks =
             >> Maybe.withDefault []
 
 
-foldLeaves :
+zipLeaves :
     List c
     -> (b -> c -> d)
     -> Collapsable a b
     -> Maybe (Collapsable a d)
-foldLeaves cs f col =
+zipLeaves cs f col =
     let
         word : b -> State (List c) d
         word b =
@@ -95,3 +100,22 @@ pop =
                             |> State.discardAndThen
                                 (State.noMutate c)
             )
+
+
+{-| [note] unused
+-}
+splitLines : List { c | top : b, width : a } -> List ( List a, b )
+splitLines =
+    List.foldr
+        (\sp lines ->
+            case lines of
+                [] ->
+                    [ ( [ sp.width ], sp.top ) ]
+
+                ( sps, top ) :: rest ->
+                    if sp.top == top then
+                        ( sp.width :: sps, top ) :: rest
+                    else
+                        ( [ sp.width ], sp.top ) :: lines
+        )
+        []

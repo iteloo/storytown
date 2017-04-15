@@ -37,7 +37,7 @@ traverseCollapsable :
 traverseCollapsable =
     let
         leaf =
-            map LoneWord
+            map LoneLeaf
 
         expandedBlock a =
             map2 ExpandedBlock a

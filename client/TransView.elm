@@ -6,7 +6,7 @@ import MyCss exposing (CssClass(..))
 import Translation.Base exposing (..)
 import Translation.Cursor exposing (..)
 import Translation.Block exposing (..)
-import Translation.Helper exposing (..)
+import Translation.Layout exposing (..)
 import Helper
 import Either exposing (Either(..))
 import AtLeastOneOf exposing (AtLeastOneOf(..))
@@ -153,6 +153,8 @@ splitCollapsable =
                 collapsedBlock
 
 
+{-| [todo] move this into the main view code to avoid using Maybe
+-}
 registerCursors :
     Collapsable a b
     -> Collapsable ( a, Maybe (CursorZipper a b) ) b
@@ -180,7 +182,7 @@ registerCursors =
                     >> top
                     >> (\(BlockZipper block ctx) -> block)
                 )
-            >> Either.fromEither LoneWord Block
+            >> Either.fromEither LoneLeaf Block
 
 
 genericBlockView :

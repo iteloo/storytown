@@ -1,12 +1,10 @@
 port module Overflow exposing (..)
 
+import Translation.Layout exposing (Measurement)
+
 
 type alias Id =
     String
-
-
-type alias Measurement =
-    List { top : Float, width : Float }
 
 
 port measureLineWrap : ( Int, Id ) -> Cmd msg

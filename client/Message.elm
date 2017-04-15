@@ -5,8 +5,7 @@ import Api
 import MediaRecorder as MR
 import Navigation as Nav
 import Translation.Base as Trans
-import Translation.Helper as Trans
-import Overflow
+import Translation.Layout as Trans
 import Time
 import Bootstrap.Navbar as Navbar
 
@@ -67,7 +66,7 @@ type StoryMsg
       -- LAYOUT
     | CollapsableChange (Trans.Collapsable String (Trans.Measured Trans.Word))
     | AnimationFrame Time.Time
-    | LineWrapMeasured Int Overflow.Measurement
+    | LineWrapMeasured Int Trans.Measurement
 
 
 type StoryEditMsg

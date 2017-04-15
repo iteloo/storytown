@@ -8,7 +8,7 @@ import Time
 import Navigation as Nav
 import Bootstrap.Navbar as Navbar
 import Translation.Base as Trans
-import Translation.Helper as Trans
+import Translation.Layout as Trans
 
 
 type alias Model =

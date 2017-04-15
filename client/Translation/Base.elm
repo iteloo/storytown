@@ -3,6 +3,8 @@ module Translation.Base exposing (..)
 import Parser exposing (TranslatedBlock(..))
 import Either exposing (Either(..))
 import AtLeastOneOf exposing (AtLeastOneOf)
+import Helper
+import Helper.Cont as Cont exposing ((<*>), (<<|))
 import List.Nonempty as Nonempty exposing (Nonempty)
 
 
@@ -14,15 +16,15 @@ type alias Word =
 
 
 type Collapsable a b
-    = LoneWord b
+    = LoneLeaf b
     | Block (Block a b)
 
 
 mapCollapsable : (a -> c) -> (b -> d) -> Collapsable a b -> Collapsable c d
 mapCollapsable f g c =
     case c of
-        LoneWord b ->
-            LoneWord (g b)
+        LoneLeaf b ->
+            LoneLeaf (g b)
 
         Block block ->
             Block (mapBlock f g block)
@@ -149,7 +151,7 @@ type LeafZipper a b
     CursorBlock ~ u
 -}
 foldr :
-    -- LoneWord
+    -- LoneLeaf
     (b -> s)
     -- Block
     -> (t -> s)
@@ -165,7 +167,7 @@ foldr :
     -> s
 foldr loneWord block cursorBlock expandedBlock terminalBlock collapsedBlock col =
     case col of
-        LoneWord w ->
+        LoneLeaf w ->
             loneWord w
 
         Block blk ->
@@ -196,6 +198,26 @@ foldr loneWord block cursorBlock expandedBlock terminalBlock collapsedBlock col 
                 block <| goBlock blk
 
 
+foldl :
+    (b -> s)
+    -> (t -> s)
+    -> (u -> t)
+    -> (a -> AtLeastOneOf t b -> t)
+    -> (a -> Nonempty b -> u)
+    -> (a -> AtLeastOneOf u b -> u)
+    -> Collapsable a b
+    -> s
+foldl loneWord block cursorBlock expandedBlock terminalBlock collapsedBlock col =
+    foldr (Cont.map loneWord)
+        (Cont.map block)
+        (Cont.map cursorBlock)
+        (\a bs -> expandedBlock <<| a <*> AtLeastOneOf.traverseCont bs)
+        (\a bs -> terminalBlock <<| a <*> Helper.nonemptyTraverseCont bs)
+        (\a bs -> collapsedBlock <<| a <*> AtLeastOneOf.traverseCont bs)
+        (mapCollapsable Cont.pure Cont.pure col)
+        identity
+
+
 
 -- FROM TRANSLATED BLOCKS
 
@@ -204,7 +226,7 @@ fullyExpanded : TranslatedBlock -> Collapsable String Word
 fullyExpanded block =
     case block of
         L2Word w ->
-            LoneWord w
+            LoneLeaf w
 
         TranslatedBlock bs_ tr_ ->
             let
@@ -227,7 +249,7 @@ fullyCollapsed : TranslatedBlock -> Collapsable String Word
 fullyCollapsed block =
     case block of
         L2Word w ->
-            LoneWord w
+            LoneLeaf w
 
         TranslatedBlock bs tr ->
             let
@@ -251,22 +273,10 @@ fullyCollapsed block =
                 Block <| CursorBlock <| fullyCollapsedInner ( bs, tr )
 
 
-translatedBlockToEither :
-    TranslatedBlock
-    -> Either ( Nonempty TranslatedBlock, String ) String
-translatedBlockToEither b =
-    case b of
-        L2Word w ->
-            Right w
-
-        TranslatedBlock bs tr ->
-            Left ( bs, tr )
-
-
 fullyCollapse : Collapsable a b -> Either (CursorBlock a b) b
 fullyCollapse collapsable =
     case collapsable of
-        LoneWord b ->
+        LoneLeaf b ->
             Right b
 
         Block block ->
@@ -291,11 +301,23 @@ fullyCollapse collapsable =
 -- HELPER
 
 
+translatedBlockToEither :
+    TranslatedBlock
+    -> Either ( Nonempty TranslatedBlock, String ) String
+translatedBlockToEither b =
+    case b of
+        L2Word w ->
+            Right w
+
+        TranslatedBlock bs tr ->
+            Left ( bs, tr )
+
+
 fromCollapsable : Collapsable a b -> Either (Block a b) b
 fromCollapsable collapsable =
     case collapsable of
         Block block ->
             Left block
 
-        LoneWord w ->
+        LoneLeaf w ->
             Right w

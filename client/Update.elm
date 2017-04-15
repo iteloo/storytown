@@ -9,7 +9,7 @@ import Api
 import Audio
 import MediaRecorder as MR
 import Translation.Base as Trans
-import Translation.Helper as Trans
+import Translation.Layout as Trans
 import Parser
 import Overflow
 import Helper
@@ -416,16 +416,8 @@ updateStoryPage { toMsg } message s =
                                     | collapsable =
                                         case item.collapsable of
                                             Raw rawCol ->
-                                                Trans.foldLeaves
-                                                    (Trans.markLinebreaks
-                                                        measurement
-                                                    )
-                                                    (\w { width, isEnd } ->
-                                                        { content = w
-                                                        , width = width
-                                                        , isEnd = isEnd
-                                                        }
-                                                    )
+                                                Trans.markLeaves
+                                                    measurement
                                                     rawCol
                                                     |> Maybe.map Formatted
                                                     |> Maybe.withDefault

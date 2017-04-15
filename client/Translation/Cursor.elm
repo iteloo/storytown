@@ -18,7 +18,7 @@ underlyingCollapsable =
 initCursorZipper : Collapsable a b -> Either b (CursorZipper a b)
 initCursorZipper collapsable =
     case collapsable of
-        LoneWord w ->
+        LoneLeaf w ->
             Left w
 
         Block block ->

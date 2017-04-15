@@ -1,5 +1,8 @@
 module Translation.Leaf exposing (..)
 
+{-| This module is currently unused
+-}
+
 import Translation.Base exposing (..)
 import Translation.Zipper as Zipper exposing (..)
 import Translation.Block as Block
@@ -12,7 +15,7 @@ import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 moveToLeaf : Zipper a b -> LeafZipper a b
 moveToLeaf (Zipper focus ctx) =
     case focus of
-        LoneWord b ->
+        LoneLeaf b ->
             LeafZipper b ctx
 
         Block block ->
@@ -27,7 +30,7 @@ moveToLeaf (Zipper focus ctx) =
                                         (List.map
                                             (Either.fromEither
                                                 Block
-                                                LoneWord
+                                                LoneLeaf
                                             )
                                             after
                                         )
@@ -35,16 +38,16 @@ moveToLeaf (Zipper focus ctx) =
                                     )
 
                             b :: bs ->
-                                Zipper (LoneWord b)
+                                Zipper (LoneLeaf b)
                                     (Down a
                                         []
                                         (List.concat
-                                            [ List.map LoneWord bs
+                                            [ List.map LoneLeaf bs
                                             , [ Block block ]
                                             , List.map
                                                 (Either.fromEither
                                                     Block
-                                                    LoneWord
+                                                    LoneLeaf
                                                 )
                                                 after
                                             ]
@@ -55,8 +58,8 @@ moveToLeaf (Zipper focus ctx) =
                     CursorBlock block ->
                         case block of
                             TerminalBlock a (Nonempty b bs) ->
-                                Zipper (LoneWord b)
-                                    (Down a [] (List.map LoneWord bs) ctx)
+                                Zipper (LoneLeaf b)
+                                    (Down a [] (List.map LoneLeaf bs) ctx)
 
                             CollapsedBlock a (AtLeastOneOf before block after) ->
                                 case before of
@@ -68,7 +71,7 @@ moveToLeaf (Zipper focus ctx) =
                                                 (List.map
                                                     (Either.fromEither
                                                         (Block << CursorBlock)
-                                                        LoneWord
+                                                        LoneLeaf
                                                     )
                                                     after
                                                 )
@@ -76,16 +79,16 @@ moveToLeaf (Zipper focus ctx) =
                                             )
 
                                     b :: bs ->
-                                        Zipper (LoneWord b)
+                                        Zipper (LoneLeaf b)
                                             (Down a
                                                 []
                                                 (List.concat
-                                                    [ List.map LoneWord bs
+                                                    [ List.map LoneLeaf bs
                                                     , [ Block <| CursorBlock block ]
                                                     , List.map
                                                         (Either.fromEither
                                                             (Block << CursorBlock)
-                                                            LoneWord
+                                                            LoneLeaf
                                                         )
                                                         after
                                                     ]
@@ -96,7 +99,7 @@ moveToLeaf (Zipper focus ctx) =
 
 toZipper : LeafZipper a b -> Zipper a b
 toZipper (LeafZipper focus ctx) =
-    Zipper (LoneWord focus) ctx
+    Zipper (LoneLeaf focus) ctx
 
 
 right : LeafZipper a b -> Maybe (LeafZipper a b)

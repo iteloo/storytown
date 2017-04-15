@@ -1,6 +1,7 @@
 module Helper exposing (..)
 
 import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
+import Helper.Cont as Cont exposing (Cont)
 
 
 maybeToList : Maybe a -> List a
@@ -68,6 +69,14 @@ nonemptyFoldrFull scons revNonempty tnil xs =
     case Nonempty.reverse xs of
         Nonempty last xs ->
             List.foldr scons (revNonempty last tnil) (List.reverse xs)
+
+
+nonemptyTraverseCont : Nonempty (Cont r a) -> Cont r (Nonempty a)
+nonemptyTraverseCont =
+    nonemptyfoldr
+        (Cont.map2 Nonempty)
+        (Cont.map2 (::))
+        (Cont.pure [])
 
 
 nonemptyLast : Nonempty a -> a

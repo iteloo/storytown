@@ -1,6 +1,7 @@
 module AtLeastOneOf exposing (..)
 
 import Either exposing (Either(..))
+import Helper.Cont as Cont exposing (..)
 import List.Nonempty as Nonempty exposing (Nonempty(..))
 
 
@@ -36,6 +37,54 @@ foldr atLeastOneOf cn1 n1 cn2 n2 l r (AtLeastOneOf bs a abs) =
     atLeastOneOf (List.foldr cn1 n1 bs)
         a
         (List.foldr cn2 n2 (List.map (Either.fromEither l r) abs))
+
+
+foldl :
+    (t -> a -> u -> s)
+    -> (b -> t -> t)
+    -> t
+    -> (v -> u -> u)
+    -> u
+    -> (a -> v)
+    -> (b -> v)
+    -> AtLeastOneOf a b
+    -> s
+foldl atLeastOneOf cn1 n1 cn2 n2 l r abs =
+    traverseHelper atLeastOneOf
+        cn1
+        n1
+        cn2
+        n2
+        l
+        r
+        (map Cont.pure Cont.pure abs)
+        identity
+
+
+traverseCont : AtLeastOneOf (Cont r a) (Cont r b) -> Cont r (AtLeastOneOf a b)
+traverseCont =
+    traverseHelper AtLeastOneOf (::) [] (::) [] Left Right
+
+
+traverseHelper :
+    (t -> a -> u -> s)
+    -> (b -> t -> t)
+    -> t
+    -> (v -> u -> u)
+    -> u
+    -> (a -> v)
+    -> (b -> v)
+    -> AtLeastOneOf (Cont r a) (Cont r b)
+    -> Cont r s
+traverseHelper atLeastOneOf cn1 n1 cn2 n2 l r abs =
+    foldr (Cont.map3 atLeastOneOf)
+        (Cont.map2 cn1)
+        (Cont.pure n1)
+        (Cont.map2 cn2)
+        (Cont.pure n2)
+        (Cont.map l)
+        (Cont.map r)
+        abs
 
 
 toList : AtLeastOneOf a a -> List a

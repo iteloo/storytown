@@ -29,7 +29,7 @@ up (Zipper focus ctx) =
                 Block block ->
                     Left block
 
-                LoneWord w ->
+                LoneLeaf w ->
                     Right w
     in
         case ctx of
