@@ -345,13 +345,13 @@ updateStoryPage { toMsg } message s =
                     s ! []
 
         -- LAYOUT
-        CollapsableChange new ->
+        CollapsableChange idx new ->
             updateSentences
                 (\para ->
                     case para of
                         Trans.Formatted para ->
                             Trans.Formatted <|
-                                Dict.update 0
+                                Dict.update idx
                                     (Maybe.map
                                         (\sen -> { sen | collapsable = new })
                                     )

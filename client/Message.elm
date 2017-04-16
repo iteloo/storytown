@@ -4,8 +4,8 @@ import Model exposing (..)
 import Api
 import MediaRecorder as MR
 import Navigation as Nav
-import Translation.Base as Trans
-import Translation.Layout as Trans
+import Translation.Base as Trans exposing (Collapsable, Word)
+import Translation.Layout as Trans exposing (Measured)
 import Time
 import Bootstrap.Navbar as Navbar
 
@@ -64,7 +64,7 @@ type StoryMsg
     | PlaybackStateChanged PlaybackState
     | NextSentence Int
       -- LAYOUT
-    | CollapsableChange (Trans.Collapsable String (Trans.Measured Trans.Word))
+    | CollapsableChange Int (Collapsable String (Measured Word))
     | AnimationFrame Time.Time
     | LineWrapMeasured Int Trans.Measurement
 

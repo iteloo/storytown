@@ -83,6 +83,28 @@ splitParagraph :
     Paragraph ( String, Maybe (CursorZipper String (Measured Word)) ) (Measured Word)
     -> Html StoryMsg
 splitParagraph =
+    div [ class [ FakeTable ] ]
+        << List.map
+            (div [ class [ FakeRow ] ]
+                << Nonempty.toList
+                << Nonempty.map .content
+            )
+        << Helper.truncateListAfter .isEnd
+        << List.concat
+        << Dict.values
+        << Dict.map
+            (\idx ->
+                Nonempty.toList
+                    << splitCollapsable idx
+                    << .collapsable
+            )
+
+
+splitCollapsable :
+    Int
+    -> Collapsable ( String, Maybe (CursorZipper String (Measured Word)) ) (Measured Word)
+    -> Nonempty (Measured (Html StoryMsg))
+splitCollapsable idx =
     let
         wordView : Measured Word -> Nonempty (Measured (Html msg))
         wordView w =
@@ -102,7 +124,8 @@ splitParagraph =
                     List.sum (List.map .width <| Nonempty.toList mbs)
             in
                 { content =
-                    genericBlockView trz
+                    genericBlockView idx
+                        trz
                         width
                         (List.map .content <| Nonempty.toList <| mbs)
                 , width = width
@@ -141,25 +164,13 @@ splitParagraph =
                 << AtLeastOneOf.toNonempty
                 << AtLeastOneOf.map identity wordView
     in
-        div [ class [ FakeTable ] ]
-            << List.map
-                (div [ class [ FakeRow ] ]
-                    << Nonempty.toList
-                    << Nonempty.map .content
-                )
-            << Helper.truncateListAfter .isEnd
-            << List.concatMap
-                (Nonempty.toList
-                    << foldr
-                        wordView
-                        identity
-                        identity
-                        expandedBlock
-                        terminalBlock
-                        collapsedBlock
-                    << .collapsable
-                )
-            << Dict.values
+        foldr
+            wordView
+            identity
+            identity
+            expandedBlock
+            terminalBlock
+            collapsedBlock
 
 
 {-| [todo] move this into the main view code to avoid using Maybe
@@ -195,11 +206,12 @@ registerCursors =
 
 
 genericBlockView :
-    ( String, Maybe (CursorZipper String (Measured Word)) )
+    Int
+    -> ( String, Maybe (CursorZipper String (Measured Word)) )
     -> Float
     -> List (Html StoryMsg)
     -> Html StoryMsg
-genericBlockView ( tr, z ) width childViews =
+genericBlockView idx ( tr, z ) width childViews =
     div
         [ class [ FakeCell ]
         , styles [ Css.width (Css.px width) ]
@@ -219,8 +231,8 @@ genericBlockView ( tr, z ) width childViews =
                                         addMin z [ Hoverarea ]
                                 ]
                               <|
-                                addCollapse z <|
-                                    addExpand z <|
+                                addCollapse idx z <|
+                                    addExpand idx z <|
                                         [ div [ class [ Padding ] ]
                                             [ div [ class [ Trans ] ]
                                                 [ text tr ]
@@ -284,10 +296,11 @@ addHasExpand z =
 
 
 addExpand :
-    Maybe (CursorZipper String (Measured Word))
+    Int
+    -> Maybe (CursorZipper String (Measured Word))
     -> List (Html StoryMsg)
     -> List (Html StoryMsg)
-addExpand z =
+addExpand idx z =
     case z |> Maybe.andThen expand of
         Nothing ->
             identity
@@ -297,7 +310,7 @@ addExpand z =
                 (div
                     [ class [ Expand ]
                     , onClick <|
-                        CollapsableChange <|
+                        CollapsableChange idx <|
                             underlyingCollapsable z
                     ]
                     [ text "v" ]
@@ -305,10 +318,11 @@ addExpand z =
 
 
 addCollapse :
-    Maybe (CursorZipper String (Measured Word))
+    Int
+    -> Maybe (CursorZipper String (Measured Word))
     -> List (Html StoryMsg)
     -> List (Html StoryMsg)
-addCollapse z =
+addCollapse idx z =
     case z |> Maybe.andThen collapse of
         Nothing ->
             identity
@@ -318,7 +332,7 @@ addCollapse z =
                 [ div
                     [ class [ Collapse ]
                     , onClick <|
-                        CollapsableChange <|
+                        CollapsableChange idx <|
                             underlyingCollapsable z
                     ]
                     [ text "^" ]
