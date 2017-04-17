@@ -26,7 +26,6 @@ type CssClass
     | Trans
     | Hoverarea
     | Min
-    | HasExpand
     | Expand
     | Collapse
 
@@ -43,11 +42,13 @@ css =
                     onHover =
                         [ backgroundColor (rgba 0 127 127 0.2) ]
                 in
-                    [ backgroundColor (rgba 0 127 127 0.05)
+                    [ position absolute
+                    , backgroundColor (rgba 0 127 127 0.05)
                     , height expandCollapseHeight
                     , fontSize (pt 8)
                     , lineHeight (num 1)
                     , hover onHover
+                    , width (pct 100)
                     ]
 
             footerHeight =
@@ -123,17 +124,12 @@ css =
                         [ display block ]
                 in
                     [ boxSizing borderBox
+                    , position relative
                       -- , maxHeight zero
                     , withClass Min
                         [ borderTop zero
                         , maxHeight zero
                         , overflow hidden
-                        ]
-                    , withClass HasExpand
-                        [ hover
-                            [ transform
-                                (translateY (pt 0 |-| expandCollapseHeight))
-                            ]
                         ]
                     , hover
                         [ children
@@ -148,6 +144,10 @@ css =
                         , class Collapse displayNone
                         ]
                     ]
-            , class Expand expandCollapse
+            , class Expand <|
+                List.concat
+                    [ [ transform (translateY (pt 0 |-| expandCollapseHeight)) ]
+                    , expandCollapse
+                    ]
             , class Collapse expandCollapse
             ]

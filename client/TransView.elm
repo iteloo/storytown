@@ -225,12 +225,7 @@ genericBlockView idx ( tr, z ) width childViews =
 
                     Just _ ->
                         [ div [ class [ SidePadding ] ]
-                            [ div
-                                [ class <|
-                                    addHasExpand z <|
-                                        addMin z [ Hoverarea ]
-                                ]
-                              <|
+                            [ div [ class <| addMin z [ Hoverarea ] ] <|
                                 addCollapse idx z <|
                                     addExpand idx z <|
                                         [ div [ class [ Padding ] ]
@@ -283,16 +278,6 @@ addMin z =
 
         Just _ ->
             identity
-
-
-addHasExpand : Maybe (CursorZipper a b) -> List CssClass -> List CssClass
-addHasExpand z =
-    case z |> Maybe.andThen expand of
-        Nothing ->
-            identity
-
-        Just _ ->
-            (::) HasExpand
 
 
 addExpand :
