@@ -88,7 +88,9 @@ css =
             , class FakeRow
                 []
             , class FakeCell
-                [ display inlineBlock ]
+                [ display inlineBlock
+                , verticalAlign top
+                ]
             , class Orig
                 [ fontSize origFontSize
                 , property "white-space" "pre"
