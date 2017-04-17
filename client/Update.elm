@@ -67,32 +67,44 @@ initDashboard user =
 subs : { a | app : AppModel } -> Sub Msg
 subs s =
     Sub.batch <|
-        [ Audio.onStateChange
-            (ReadyMsg << PageMsg << StoryMsg << PlaybackStateChanged)
-        ]
-            ++ case s.app of
+        List.concat
+            [ [ Audio.onStateChange
+                    (ReadyMsg << PageMsg << StoryMsg << PlaybackStateChanged)
+              ]
+            , case s.app of
                 Ready rm ->
                     case rm.page of
-                        StoryPage _ ->
-                            [ AnimationFrame.times
-                                (ReadyMsg
-                                    << PageMsg
-                                    << StoryMsg
-                                    << AnimationFrame
-                                )
-                            , Overflow.lineWrapMeasured
-                                (ReadyMsg
-                                    << PageMsg
-                                    << StoryMsg
-                                    << uncurry LineWrapMeasured
-                                )
-                            ]
+                        StoryPage s ->
+                            case s.story of
+                                RD.Success sty ->
+                                    case sty.sentences of
+                                        Trans.Raw _ ->
+                                            [ AnimationFrame.times
+                                                (ReadyMsg
+                                                    << PageMsg
+                                                    << StoryMsg
+                                                    << AnimationFrame
+                                                )
+                                            , Overflow.lineWrapMeasured
+                                                (ReadyMsg
+                                                    << PageMsg
+                                                    << StoryMsg
+                                                    << uncurry LineWrapMeasured
+                                                )
+                                            ]
+
+                                        _ ->
+                                            []
+
+                                _ ->
+                                    []
 
                         _ ->
                             []
 
                 _ ->
                     []
+            ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )

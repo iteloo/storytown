@@ -109,7 +109,9 @@ css =
                 , paddingTop (pt 1.2)
                 ]
             , class Trans
-                [ color (rgba 0 127 0 0.7) ]
+                [ color (rgba 0 127 0 0.7)
+                , fontSize (pt 9)
+                ]
             , class Hoverarea <|
                 let
                     displayNone =
