@@ -112,6 +112,19 @@ mkCons cond cons a segs =
                 cons (a ::: x) xs
 
 
+zipList : List a -> List b -> Maybe (List ( a, b ))
+zipList xs ys =
+    case ( xs, ys ) of
+        ( x :: xs, y :: ys ) ->
+            Maybe.map ((::) ( x, y )) (zipList xs ys)
+
+        ( [], [] ) ->
+            Just []
+
+        _ ->
+            Nothing
+
+
 
 -- SCRAPS
 

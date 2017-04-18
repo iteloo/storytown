@@ -10,9 +10,12 @@ import Audio
 import MediaRecorder as MR
 import Translation.Base as Trans
 import Translation.Layout as Trans
+import Translation.Path as Trans
+import Translation.MaybeTraverse as TransMaybe
 import Parser
 import Overflow
 import Helper
+import Either exposing (Either(..))
 import Dict
 import Task
 import Time
@@ -85,7 +88,7 @@ subs s =
                                                     << StoryMsg
                                                     << AnimationFrame
                                                 )
-                                            , Overflow.lineWrapMeasured
+                                            , Overflow.measured
                                                 (ReadyMsg
                                                     << PageMsg
                                                     << StoryMsg
@@ -201,10 +204,6 @@ updatePage { toMsg } msg s =
             badMsgState msg s
 
 
-
--- badMsgState msg s
-
-
 updateLogin :
     { toMsg : LoginMsg -> Msg }
     -> LoginMsg
@@ -261,16 +260,22 @@ updateStoryPage { toMsg } message s =
         StoryReceived story ->
             let
                 itemToSentence { text, audioUrl } =
-                    (case Parser.parseTranslatedText text of
+                    case Parser.parseTranslatedText text of
                         Ok r ->
-                            { collapsable = Trans.fullyCollapsed r
+                            { collapsable =
+                                Trans.fullyCollapsed r
+                                    |> Trans.mapCollapsable
+                                        (String.toList
+                                            >> List.map String.fromChar
+                                            >> Left
+                                        )
+                                        identity
                             , audioUrl = audioUrl
                             }
 
                         Err e ->
                             -- [todo] handle gracefully
                             Debug.crash "cannot parse into translation"
-                    )
             in
                 { s
                     | story =
@@ -279,11 +284,12 @@ updateStoryPage { toMsg } message s =
                                 { title = sty.title
                                 , sentences =
                                     Trans.Raw <|
-                                        Dict.fromList <|
-                                            List.indexedMap (,) <|
-                                                List.map
-                                                    itemToSentence
-                                                    sty.sentences
+                                        Left <|
+                                            Dict.fromList <|
+                                                List.indexedMap (,) <|
+                                                    List.map
+                                                        itemToSentence
+                                                        sty.sentences
                                 }
                             )
                             story
@@ -383,12 +389,27 @@ updateStoryPage { toMsg } message s =
                         (\story ->
                             ()
                                 ! case story.sentences of
-                                    Trans.Raw _ ->
-                                        [ Overflow.measureLineWrap
-                                            -- [todo] use this to handle
-                                            --        multi-paragraph
-                                            ( 0, "measureDiv0" )
-                                        ]
+                                    Trans.Raw para ->
+                                        List.concat
+                                            [ let
+                                                both =
+                                                    Dict.map
+                                                        (\idx ss ->
+                                                            Trans.pathedMap
+                                                                (\path _ ->
+                                                                    Overflow.measure
+                                                                        (Trans.TransMeasure idx path)
+                                                                )
+                                                                ss.collapsable
+                                                        )
+                                                        >> Dict.values
+                                                        >> List.concatMap Trans.nodes
+                                              in
+                                                Either.fromEither both both para
+                                            , [ Overflow.measure
+                                                    Trans.WordsMeasure
+                                              ]
+                                            ]
 
                                     _ ->
                                         []
@@ -397,7 +418,7 @@ updateStoryPage { toMsg } message s =
             in
                 s ! [ cmd ]
 
-        LineWrapMeasured idx measurement ->
+        LineWrapMeasured m measurement ->
             let
                 loadAudio s =
                     s
@@ -421,20 +442,96 @@ updateStoryPage { toMsg } message s =
                             |> Maybe.map Audio.load
                             |> Helper.maybeToList
                           )
+
+                check : Trans.Paragraph (Either a c) b -> Maybe (Trans.Paragraph c b)
+                check =
+                    Dict.map
+                        (\_ sen ->
+                            sen.collapsable
+                                |> Trans.mapCollapsable Either.toMaybe Just
+                                >> TransMaybe.traverse
+                                >> Maybe.map (\col -> { sen | collapsable = col })
+                        )
+                        >> Dict.foldr (Maybe.map2 << Dict.insert) (Just Dict.empty)
             in
                 -- [todo] change this to measure the concatenation of items
                 updateSentences
-                    (\para ->
-                        case para of
+                    (\layout ->
+                        case layout of
                             Trans.Raw para ->
-                                Trans.markLeaves
-                                    measurement
-                                    para
-                                    |> Maybe.map Trans.Formatted
-                                    |> Maybe.withDefault
-                                        (Trans.LayoutError
-                                            Trans.CannotZipWidths
-                                        )
+                                case m of
+                                    Trans.TransMeasure idx path ->
+                                        let
+                                            both para =
+                                                Dict.get idx para
+                                                    |> Maybe.andThen
+                                                        (\sen ->
+                                                            sen.collapsable
+                                                                |> Trans.nodeAtPath path
+                                                                |> Maybe.andThen
+                                                                    (Either.fromEither
+                                                                        (Helper.zipList measurement
+                                                                            >> Maybe.map
+                                                                                (List.map
+                                                                                    (\( { width }, tr ) ->
+                                                                                        { content = tr
+                                                                                        , width =
+                                                                                            width
+                                                                                            -- [tmp] bogus value
+                                                                                        , isEnd = True
+                                                                                        }
+                                                                                    )
+                                                                                )
+                                                                        )
+                                                                        Just
+                                                                    )
+                                                                |> Maybe.andThen
+                                                                    (Right
+                                                                        >> flip (Trans.setAtPath path)
+                                                                            sen.collapsable
+                                                                    )
+                                                                |> Maybe.map
+                                                                    (\col ->
+                                                                        Dict.insert idx
+                                                                            { sen | collapsable = col }
+                                                                            para
+                                                                    )
+                                                        )
+
+                                            handleError =
+                                                Maybe.withDefault
+                                                    -- [tmp] error not accurate
+                                                    (Trans.LayoutError Trans.CannotZipWidths)
+                                        in
+                                            para
+                                                |> Either.fromEither
+                                                    (both >> Maybe.map (Left >> Trans.Raw) >> handleError)
+                                                    (both
+                                                        >> Maybe.map
+                                                            (\para ->
+                                                                check para
+                                                                    |> Maybe.map Trans.Formatted
+                                                                    |> Maybe.withDefault (para |> Right >> Trans.Raw)
+                                                            )
+                                                        >> handleError
+                                                    )
+
+                                    Trans.WordsMeasure ->
+                                        case para of
+                                            Left para ->
+                                                para
+                                                    |> Trans.markLeaves measurement
+                                                    |> Maybe.map
+                                                        (\para ->
+                                                            check para
+                                                                |> Maybe.map Trans.Formatted
+                                                                |> Maybe.withDefault (para |> Right >> Trans.Raw)
+                                                        )
+                                                    |> Maybe.withDefault
+                                                        (Trans.LayoutError Trans.CannotZipWidths)
+
+                                            x ->
+                                                Trans.Raw x
 
                             x ->
                                 -- [todo] think about this more

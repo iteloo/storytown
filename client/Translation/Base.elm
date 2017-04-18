@@ -38,11 +38,11 @@ type Block a b
 mapBlock : (a -> c) -> (b -> d) -> Block a b -> Block c d
 mapBlock f g block =
     case block of
-        CursorBlock block ->
-            CursorBlock (mapCursorBlock f g block)
-
         ExpandedBlock a bs ->
             ExpandedBlock (f a) (AtLeastOneOf.map (mapBlock f g) g bs)
+
+        CursorBlock block ->
+            CursorBlock (mapCursorBlock f g block)
 
 
 getNodeBlock : Block a b -> a
@@ -53,6 +53,16 @@ getNodeBlock block =
 
         CursorBlock cblock ->
             getNodeCursorBlock cblock
+
+
+updateNodeBlock : (a -> a) -> Block a b -> Block a b
+updateNodeBlock f block =
+    case block of
+        ExpandedBlock a bs ->
+            ExpandedBlock (f a) bs
+
+        CursorBlock cblock ->
+            CursorBlock (updateNodeCursorBlock f cblock)
 
 
 type CursorBlock a b
@@ -66,7 +76,7 @@ getNodeCursorBlock block =
         TerminalBlock a _ ->
             a
 
-        CollapsedBlock a bs ->
+        CollapsedBlock a _ ->
             a
 
 
@@ -121,6 +131,11 @@ getNodeBlockZipper (BlockZipper block ctx) =
     getNodeBlock block
 
 
+updateNodeBlockZipper : (a -> a) -> BlockZipper a b -> BlockZipper a b
+updateNodeBlockZipper f (BlockZipper block ctx) =
+    BlockZipper (updateNodeBlock f block) ctx
+
+
 type CursorZipper a b
     = CursorZipper (CursorBlock a b) (Ctx a b)
 
@@ -142,6 +157,27 @@ updateNodeCursorZipper f (CursorZipper block ctx) =
 
 type LeafZipper a b
     = LeafZipper b (Ctx a b)
+
+
+nodes : Collapsable a b -> List a
+nodes =
+    foldr
+        (always [])
+        identity
+        identity
+        (\a ->
+            (::) a
+                << List.concat
+                << AtLeastOneOf.toList
+                << AtLeastOneOf.map identity (always [])
+        )
+        (\a -> always [ a ])
+        (\a ->
+            (::) a
+                << List.concat
+                << AtLeastOneOf.toList
+                << AtLeastOneOf.map identity (always [])
+        )
 
 
 {-| a ~ a

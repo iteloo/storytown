@@ -19,13 +19,13 @@
       var app = Elm.Main.fullscreen();
 
       /* OVERFLOW */
-      app.ports.measureLineWrap.subscribe(info => {
+      app.ports.measureRaw.subscribe(info => {
 
         /* [note] assumes input is a node with spans as children;
                   the children should already have the necessary spaces
                   included
         */
-        var $el = $('#'+info[1])
+        var $el = $('#'+info)
         var result = $el.find('span').map(function() {
           return {
             top: $(this).position().top
@@ -33,7 +33,7 @@
           }
         }).toArray();
         if (result != undefined) {
-          app.ports.lineWrapMeasured.send([info[0],result])
+          app.ports.measuredRaw.send([info,result])
         }
       });
 

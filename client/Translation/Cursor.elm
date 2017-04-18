@@ -12,7 +12,7 @@ import AtLeastOneOf exposing (AtLeastOneOf(..))
 
 underlyingCollapsable : CursorZipper a b -> Collapsable a b
 underlyingCollapsable =
-    (\(BlockZipper block _) -> Block block) << top << toBlockZipper
+    Translation.Block.underlyingCollapsable << top << toBlockZipper
 
 
 initCursorZipper : Collapsable a b -> Either b (CursorZipper a b)

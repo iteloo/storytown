@@ -64,9 +64,9 @@ type StoryMsg
     | PlaybackStateChanged PlaybackState
     | NextSentence Int
       -- LAYOUT
-    | CollapsableChange Int (Collapsable String (Measured Word))
+    | CollapsableChange Int (Collapsable (List (Measured String)) (Measured Word))
     | AnimationFrame Time.Time
-    | LineWrapMeasured Int Trans.Measurement
+    | LineWrapMeasured Trans.Measure Trans.Measurement
 
 
 type StoryEditMsg

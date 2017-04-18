@@ -26,6 +26,11 @@ fromEither f g e =
             g b
 
 
+toMaybe : Either a b -> Maybe b
+toMaybe =
+    fromEither (always Nothing) Just
+
+
 andRight : (b -> Either a c) -> Either a b -> Either a c
 andRight =
     fromEither Left

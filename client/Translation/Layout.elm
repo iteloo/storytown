@@ -6,14 +6,21 @@ module Translation.Layout
         , ParagraphLayoutError(..)
         , Measurement
         , Measured
+        , Measure(..)
+        , toDivId
+        , fromDivId
         , markLeaves
         )
 
 import Translation.Base exposing (..)
+import Translation.Path exposing (Path)
 import Translation.StateTraverse
 import Helper.State as State exposing (State)
+import Either exposing (Either)
 import Dict
 import List.Nonempty as Nonempty exposing ((:::))
+import Combine exposing (string, (<*>), (<*), (*>), (<$), (<$>), many)
+import Combine.Num exposing (int)
 
 
 type alias Paragraph a b =
@@ -27,7 +34,7 @@ type alias Paragraph a b =
 
 type alias ParagraphLayout =
     -- [todo] clean up namespace
-    Layout (Paragraph String Word) (Paragraph String (Measured Word)) ParagraphLayoutError
+    Layout (Either (Paragraph (Either (List String) (List (Measured String))) Word) (Paragraph (Either (List String) (List (Measured String))) (Measured Word))) (Paragraph (List (Measured String)) (Measured Word)) ParagraphLayoutError
 
 
 type Layout a b e
@@ -49,6 +56,47 @@ type alias Measured a =
     , width : Float
     , isEnd : Bool
     }
+
+
+type Measure
+    = TransMeasure Int Path
+    | WordsMeasure
+
+
+toDivId : Measure -> String
+toDivId m =
+    case m of
+        TransMeasure idx path ->
+            String.concat
+                [ "transMeasureDiv"
+                , toString idx
+                , "-"
+                , path
+                    |> List.map toString
+                    >> List.intersperse "x"
+                    >> List.foldr (++) ""
+                ]
+
+        WordsMeasure ->
+            "wordsMeasureDiv"
+
+
+fromDivId : String -> Maybe Measure
+fromDivId =
+    Combine.parse
+        (Combine.choice
+            [ TransMeasure
+                <$ string "transMeasureDiv"
+                <*> int
+                <* string "-"
+                <*> ((::) <$> int <*> many (string "x" *> int))
+            , WordsMeasure
+                <$ string "wordsMeasureDiv"
+            ]
+            <* Combine.end
+        )
+        >> Result.toMaybe
+        >> Maybe.map (\( _, _, r ) -> r)
 
 
 markLeaves :

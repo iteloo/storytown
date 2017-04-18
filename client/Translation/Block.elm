@@ -6,6 +6,11 @@ import AtLeastOneOf exposing (AtLeastOneOf(..))
 import Helper
 
 
+underlyingCollapsable : BlockZipper a b -> Collapsable a b
+underlyingCollapsable (BlockZipper block _) =
+    Block block
+
+
 initTop : Block a b -> BlockZipper a b
 initTop =
     flip BlockZipper Top
@@ -45,6 +50,39 @@ up (BlockZipper focus ctx) =
                         )
                     )
                     parctx
+
+
+down : BlockZipper a b -> Maybe (BlockZipper a b)
+down (BlockZipper focus ctx) =
+    case focus of
+        ExpandedBlock tr (AtLeastOneOf before block after) ->
+            Just <|
+                BlockZipper block
+                    (Down tr
+                        (List.map LoneLeaf before)
+                        (List.map (Either.fromEither Block LoneLeaf) after)
+                        ctx
+                    )
+
+        CursorBlock cblock ->
+            case cblock of
+                TerminalBlock _ _ ->
+                    Nothing
+
+                CollapsedBlock tr (AtLeastOneOf before block after) ->
+                    Just <|
+                        BlockZipper (CursorBlock block)
+                            (Down tr
+                                (List.map LoneLeaf before)
+                                (List.map
+                                    (Either.fromEither
+                                        (Block << CursorBlock)
+                                        LoneLeaf
+                                    )
+                                    after
+                                )
+                                ctx
+                            )
 
 
 bottom : BlockZipper a b -> CursorZipper a b

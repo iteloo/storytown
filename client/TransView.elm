@@ -6,7 +6,9 @@ import Translation.Base exposing (..)
 import Translation.Cursor exposing (..)
 import Translation.Block exposing (..)
 import Translation.Layout exposing (..)
+import Translation.Path exposing (..)
 import Helper
+import Helper.State2
 import Either exposing (Either(..))
 import AtLeastOneOf exposing (AtLeastOneOf(..))
 import Html exposing (..)
@@ -29,21 +31,63 @@ styles =
 
 view : Int -> ParagraphLayout -> Html StoryMsg
 view idx layout =
-    case layout of
-        Raw raw ->
-            measureDiv idx raw
+    let
+        paragraphMeasureDivs :
+            Paragraph (Either (List String) (List (Measured String))) b
+            -> List (Html StoryMsg)
+        paragraphMeasureDivs =
+            List.concatMap
+                (\( idx, sen ) ->
+                    nodes <|
+                        pathedMap
+                            (\path ->
+                                sentenceMeasureDiv
+                                    (toDivId (TransMeasure idx path))
+                            )
+                        <|
+                            mapCollapsable
+                                (Either.fromEither identity (List.map .content))
+                                identity
+                                sen.collapsable
+                )
+                << Dict.toList
+    in
+        case layout of
+            Raw raw ->
+                div [] <|
+                    List.concat
+                        [ Either.fromEither
+                            (List.singleton << measureDiv idx)
+                            (always [])
+                            raw
+                        , Either.fromEither
+                            paragraphMeasureDivs
+                            paragraphMeasureDivs
+                            raw
+                        ]
 
-        Formatted para ->
-            para
-                |> Dict.map
-                    (\_ i ->
-                        { i | collapsable = registerCursors i.collapsable }
-                    )
-                |> splitParagraph
+            Formatted para ->
+                para
+                    |> Dict.map
+                        (\_ i ->
+                            { i | collapsable = registerCursors i.collapsable }
+                        )
+                    |> splitParagraph
 
-        LayoutError e ->
-            -- [todo] handle more gracefully
-            Debug.crash ("layout error: " ++ toString e)
+            LayoutError e ->
+                -- [todo] handle more gracefully
+                Debug.crash ("layout error: " ++ toString e)
+
+
+sentenceMeasureDiv : String -> List String -> Html msg
+sentenceMeasureDiv id =
+    div
+        [ Html.Attributes.id id
+        , class [ SentenceMeasurementDiv ]
+        ]
+        -- [note] currently only splits by character
+        <<
+            List.map (span [] << List.singleton << text)
 
 
 measureDiv : Int -> Paragraph a Word -> Html msg
@@ -59,7 +103,7 @@ measureDiv _ =
                 << AtLeastOneOf.map identity singleWordSpan
     in
         div
-            [ Html.Attributes.id "measureDiv0"
+            [ Html.Attributes.id (toDivId WordsMeasure)
             , class [ MeasurementDiv ]
             ]
             << List.concatMap
@@ -80,7 +124,7 @@ measureDiv _ =
 
 
 splitParagraph :
-    Paragraph ( String, Maybe (CursorZipper String (Measured Word)) ) (Measured Word)
+    Paragraph ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word)
     -> Html StoryMsg
 splitParagraph =
     div [ class [ FakeTable ] ]
@@ -102,7 +146,7 @@ splitParagraph =
 
 splitCollapsable :
     Int
-    -> Collapsable ( String, Maybe (CursorZipper String (Measured Word)) ) (Measured Word)
+    -> Collapsable ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word)
     -> Nonempty (Measured (Html StoryMsg))
 splitCollapsable idx =
     let
@@ -118,6 +162,73 @@ splitCollapsable idx =
                             [ text w.content ]
                 }
 
+        splitTrans :
+            ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
+            -> Nonempty (Nonempty (Measured (Html StoryMsg)))
+            -> Nonempty (Measured (Html StoryMsg))
+        splitTrans ( trs, z ) =
+            let
+                -- [tmp] hard-coded guess
+                ellipsesWidth =
+                    3
+            in
+                Nonempty.indexedMap
+                    (\i cs ->
+                        ( cs
+                        , (-) (cs |> Nonempty.toList |> List.map .width |> List.sum)
+                            ((if i == 0 then
+                                1
+                              else
+                                2
+                             )
+                                * ellipsesWidth
+                            )
+                        )
+                    )
+                    >> Nonempty.map
+                        (let
+                            mon :
+                                ( Nonempty (Measured (Html StoryMsg)), Float )
+                                -> List (Measured String)
+                                -> ( Measured (Html StoryMsg), List (Measured String) )
+                            mon =
+                                (\( cs, cwdt ) rem ->
+                                    let
+                                        go :
+                                            List (Measured String)
+                                            -> Float
+                                            -> List (Measured String)
+                                            -> ( List (Measured String), List (Measured String) )
+                                        go revtrs w rem =
+                                            let
+                                                end =
+                                                    ( List.reverse revtrs, rem )
+                                            in
+                                                case rem of
+                                                    [] ->
+                                                        end
+
+                                                    tr :: rem_ ->
+                                                        if tr.width + w < cwdt then
+                                                            go (tr :: revtrs) (tr.width + w) rem_
+                                                        else
+                                                            end
+                                    in
+                                        go [] 0 rem
+                                            |> \( trs, rem ) ->
+                                                ( mkBlock ( trs, z ) cs, rem )
+                                )
+                         in
+                            mon
+                        )
+                    >> traverseNonempty
+                    >> Helper.State2.runState trs
+                    >> Tuple.first
+
+        mkBlock :
+            ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
+            -> Nonempty (Measured (Html StoryMsg))
+            -> Measured (Html StoryMsg)
         mkBlock trz mbs =
             let
                 width =
@@ -125,7 +236,11 @@ splitCollapsable idx =
             in
                 { content =
                     genericBlockView idx
-                        trz
+                        -- [tmp] doesn't split trans
+                        (Tuple.mapFirst
+                            (List.foldr (++) "" << List.map .content)
+                            trz
+                        )
                         width
                         (List.map .content <| Nonempty.toList <| mbs)
                 , width = width
@@ -133,32 +248,32 @@ splitCollapsable idx =
                 }
 
         expandedBlock :
-            ( String, Maybe (CursorZipper String (Measured Word)) )
+            ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
             -> AtLeastOneOf (Nonempty (Measured (Html StoryMsg))) (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
-        expandedBlock trz =
-            Nonempty.map (mkBlock trz)
+        expandedBlock trzs =
+            splitTrans trzs
                 << Helper.truncateAfter .isEnd
                 << Nonempty.concat
                 << AtLeastOneOf.toNonempty
                 << AtLeastOneOf.map identity wordView
 
         terminalBlock :
-            ( String, Maybe (CursorZipper String (Measured Word)) )
+            ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
             -> Nonempty (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
-        terminalBlock trz =
-            Nonempty.map (mkBlock trz)
+        terminalBlock trzs =
+            splitTrans trzs
                 << Helper.truncateAfter .isEnd
                 << Nonempty.concatMap wordView
 
         -- [note] identical to expandedBlock right now
         collapsedBlock :
-            ( String, Maybe (CursorZipper String (Measured Word)) )
+            ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
             -> AtLeastOneOf (Nonempty (Measured (Html StoryMsg))) (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
-        collapsedBlock trz =
-            Nonempty.map (mkBlock trz)
+        collapsedBlock trzs =
+            splitTrans trzs
                 << Helper.truncateAfter .isEnd
                 << Nonempty.concat
                 << AtLeastOneOf.toNonempty
@@ -207,7 +322,7 @@ registerCursors =
 
 genericBlockView :
     Int
-    -> ( String, Maybe (CursorZipper String (Measured Word)) )
+    -> ( String, Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
     -> Float
     -> List (Html StoryMsg)
     -> Html StoryMsg
@@ -282,7 +397,7 @@ addMin z =
 
 addExpand :
     Int
-    -> Maybe (CursorZipper String (Measured Word))
+    -> Maybe (CursorZipper (List (Measured String)) (Measured Word))
     -> List (Html StoryMsg)
     -> List (Html StoryMsg)
 addExpand idx z =
@@ -296,7 +411,7 @@ addExpand idx z =
                     [ class [ Expand ]
                     , onClick <|
                         CollapsableChange idx <|
-                            underlyingCollapsable z
+                            Translation.Cursor.underlyingCollapsable z
                     ]
                     [ text "v" ]
                 )
@@ -304,7 +419,7 @@ addExpand idx z =
 
 addCollapse :
     Int
-    -> Maybe (CursorZipper String (Measured Word))
+    -> Maybe (CursorZipper (List (Measured String)) (Measured Word))
     -> List (Html StoryMsg)
     -> List (Html StoryMsg)
 addCollapse idx z =
@@ -318,7 +433,7 @@ addCollapse idx z =
                     [ class [ Collapse ]
                     , onClick <|
                         CollapsableChange idx <|
-                            underlyingCollapsable z
+                            Translation.Cursor.underlyingCollapsable z
                     ]
                     [ text "^" ]
                 ]

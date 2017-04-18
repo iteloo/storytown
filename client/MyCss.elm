@@ -21,6 +21,7 @@ type CssClass
     | FakeRow
     | FakeCell
     | MeasurementDiv
+    | SentenceMeasurementDiv
     | SidePadding
     | Padding
     | Trans
@@ -36,6 +37,9 @@ css =
         let
             origFontSize =
                 pt 24
+
+            transFontSize =
+                pt 10
 
             expandCollapse =
                 let
@@ -101,6 +105,11 @@ css =
                 [ fontSize origFontSize
                 , textAlign left
                 ]
+            , class SentenceMeasurementDiv
+                [ fontSize transFontSize
+                , whiteSpace noWrap
+                , textAlign left
+                ]
             , class SidePadding
                 [ paddingLeft (pt 2)
                 , paddingRight (pt 2)
@@ -113,7 +122,7 @@ css =
                 ]
             , class Trans
                 [ color (rgba 0 127 0 0.7)
-                , fontSize (pt 9)
+                , fontSize transFontSize
                 ]
             , class Hoverarea <|
                 let
