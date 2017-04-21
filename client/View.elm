@@ -200,7 +200,7 @@ storyView s =
                 text "Cannot load..."
 
             RD.Success story ->
-                TransView.view 0 story.sentences
+                TransView.view story.sentences
         ]
 
 

@@ -39,21 +39,24 @@ css =
                 pt 24
 
             transFontSize =
-                pt 10
+                pt 20
+
+            green =
+                rgba 0 127 0
+
+            blueGreen =
+                rgba 0 127 127
 
             expandCollapse =
-                let
-                    onHover =
-                        [ backgroundColor (rgba 0 127 127 0.2) ]
-                in
-                    [ position absolute
-                    , backgroundColor (rgba 0 127 127 0.05)
-                    , height expandCollapseHeight
-                    , fontSize (pt 8)
-                    , lineHeight (num 1)
-                    , hover onHover
-                    , width (pct 100)
-                    ]
+                [ position absolute
+                , backgroundColor (blueGreen 0.05)
+                , height expandCollapseHeight
+                , fontSize (pt 8)
+                , lineHeight (num 1)
+                , hover
+                    [ backgroundColor (green 0.2) ]
+                , width (pct 100)
+                ]
 
             footerHeight =
                 auto
@@ -116,12 +119,12 @@ css =
                 , textAlign center
                 ]
             , class Padding
-                [ borderTop3 (px 1.3) solid (rgba 0 127 0 0.4)
+                [ borderTop3 (px 1.3) solid (green 0.4)
                 , paddingBottom (pt 1.2)
                 , paddingTop (pt 1.2)
                 ]
             , class Trans
-                [ color (rgba 0 127 0 0.7)
+                [ color (green 0.7)
                 , fontSize transFontSize
                 ]
             , class Hoverarea <|
@@ -143,7 +146,7 @@ css =
                     , hover
                         [ children
                             [ class Padding
-                                [ backgroundColor (rgba 0 127 0 0.1) ]
+                                [ backgroundColor (green 0.1) ]
                             , class Expand displayBlock
                             , class Collapse displayBlock
                             ]

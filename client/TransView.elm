@@ -29,93 +29,77 @@ styles =
     Css.asPairs >> Html.Attributes.style
 
 
-view : Int -> ParagraphLayout -> Html StoryMsg
-view idx layout =
+view : ParagraphLayout -> Html StoryMsg
+view layout =
+    case layout of
+        Raw ( raw, ellipses ) ->
+            div [] <|
+                List.concat
+                    [ Either.fromEither
+                        (List.singleton << wordsMeasureDiv)
+                        (always [])
+                        raw
+                    , Either.fromEither
+                        paragraphMeasureDivs
+                        paragraphMeasureDivs
+                        raw
+                    , case ellipses of
+                        Nothing ->
+                            -- [tmp] hard-coded
+                            [ measureDiv EllipsesMeasure [ "..." ] ]
+
+                        Just _ ->
+                            []
+                    ]
+
+        Formatted ( para, ellipses ) ->
+            para
+                |> Dict.map
+                    (\_ i ->
+                        { i | collapsable = registerCursors i.collapsable }
+                    )
+                |> splitParagraph ellipses
+
+        LayoutError e ->
+            -- [todo] handle more gracefully
+            Debug.crash ("layout error: " ++ toString e)
+
+
+paragraphMeasureDivs :
+    Paragraph (Either (List String) (List (Measured String))) b
+    -> List (Html StoryMsg)
+paragraphMeasureDivs =
+    List.concatMap
+        (\( idx, sen ) ->
+            nodes <|
+                pathedMap (measureDiv << TransMeasure idx) <|
+                    mapCollapsable
+                        (Either.fromEither identity (List.map .content))
+                        identity
+                        sen.collapsable
+        )
+        << Dict.toList
+
+
+wordsMeasureDiv : Paragraph a Word -> Html msg
+wordsMeasureDiv =
     let
-        paragraphMeasureDivs :
-            Paragraph (Either (List String) (List (Measured String))) b
-            -> List (Html StoryMsg)
-        paragraphMeasureDivs =
-            List.concatMap
-                (\( idx, sen ) ->
-                    nodes <|
-                        pathedMap
-                            (\path ->
-                                sentenceMeasureDiv
-                                    (toDivId (TransMeasure idx path))
-                            )
-                        <|
-                            mapCollapsable
-                                (Either.fromEither identity (List.map .content))
-                                identity
-                                sen.collapsable
-                )
-                << Dict.toList
-    in
-        case layout of
-            Raw raw ->
-                div [] <|
-                    List.concat
-                        [ Either.fromEither
-                            (List.singleton << measureDiv idx)
-                            (always [])
-                            raw
-                        , Either.fromEither
-                            paragraphMeasureDivs
-                            paragraphMeasureDivs
-                            raw
-                        ]
-
-            Formatted para ->
-                para
-                    |> Dict.map
-                        (\_ i ->
-                            { i | collapsable = registerCursors i.collapsable }
-                        )
-                    |> splitParagraph
-
-            LayoutError e ->
-                -- [todo] handle more gracefully
-                Debug.crash ("layout error: " ++ toString e)
-
-
-sentenceMeasureDiv : String -> List String -> Html msg
-sentenceMeasureDiv id =
-    div
-        [ Html.Attributes.id id
-        , class [ SentenceMeasurementDiv ]
-        ]
-        -- [note] currently only splits by character
-        <<
-            List.map (span [] << List.singleton << text)
-
-
-measureDiv : Int -> Paragraph a Word -> Html msg
-measureDiv _ =
-    -- [note] unused first arg
-    let
-        singleWordSpan w =
-            [ span [] [ text w ] ]
-
         nontermBlock _ =
             List.concat
                 << AtLeastOneOf.toList
-                << AtLeastOneOf.map identity singleWordSpan
+                << AtLeastOneOf.map identity List.singleton
     in
-        div
-            [ Html.Attributes.id (toDivId WordsMeasure)
-            , class [ MeasurementDiv ]
-            ]
+        measureDiv WordsMeasure
             << List.concatMap
                 (foldr
-                    singleWordSpan
+                    List.singleton
                     identity
                     identity
                     nontermBlock
                     (\_ ->
                         List.concat
                             << Nonempty.toList
-                            << Nonempty.map singleWordSpan
+                            << Nonempty.map List.singleton
                     )
                     nontermBlock
                     << .collapsable
@@ -123,10 +107,30 @@ measureDiv _ =
             << Dict.values
 
 
+measureDiv : Measure -> List String -> Html msg
+measureDiv m =
+    div
+        [ Html.Attributes.id (toDivId m)
+        , class
+            [ case m of
+                TransMeasure _ _ ->
+                    SentenceMeasurementDiv
+
+                WordsMeasure ->
+                    MeasurementDiv
+
+                EllipsesMeasure ->
+                    SentenceMeasurementDiv
+            ]
+        ]
+        << List.map (span [] << List.singleton << text)
+
+
 splitParagraph :
-    Paragraph ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word)
+    Measured String
+    -> Paragraph ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word)
     -> Html StoryMsg
-splitParagraph =
+splitParagraph ellipses =
     div [ class [ FakeTable ] ]
         << List.map
             (div [ class [ FakeRow ] ]
@@ -139,16 +143,17 @@ splitParagraph =
         << Dict.map
             (\idx ->
                 Nonempty.toList
-                    << splitCollapsable idx
+                    << splitCollapsable ellipses idx
                     << .collapsable
             )
 
 
 splitCollapsable :
-    Int
+    Measured String
+    -> Int
     -> Collapsable ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word)
     -> Nonempty (Measured (Html StoryMsg))
-splitCollapsable idx =
+splitCollapsable ellipses idx =
     let
         wordView : Measured Word -> Nonempty (Measured (Html msg))
         wordView w =
@@ -167,63 +172,56 @@ splitCollapsable idx =
             -> Nonempty (Nonempty (Measured (Html StoryMsg)))
             -> Nonempty (Measured (Html StoryMsg))
         splitTrans ( trs, z ) =
-            let
-                -- [tmp] hard-coded guess
-                ellipsesWidth =
-                    3
-            in
-                Nonempty.indexedMap
-                    (\i cs ->
-                        ( cs
-                        , (-) (cs |> Nonempty.toList |> List.map .width |> List.sum)
-                            ((if i == 0 then
-                                1
-                              else
-                                2
-                             )
-                                * ellipsesWidth
-                            )
-                        )
-                    )
-                    >> Nonempty.map
-                        (let
-                            mon :
-                                ( Nonempty (Measured (Html StoryMsg)), Float )
-                                -> List (Measured String)
-                                -> ( Measured (Html StoryMsg), List (Measured String) )
-                            mon =
-                                (\( cs, cwdt ) rem ->
-                                    let
-                                        go :
-                                            List (Measured String)
-                                            -> Float
-                                            -> List (Measured String)
-                                            -> ( List (Measured String), List (Measured String) )
-                                        go revtrs w rem =
-                                            let
-                                                end =
-                                                    ( List.reverse revtrs, rem )
-                                            in
-                                                case rem of
-                                                    [] ->
-                                                        end
+            Nonempty.indexedMap
+                (\i ->
+                    let
+                        mon :
+                            Nonempty (Measured (Html StoryMsg))
+                            -> List (Measured String)
+                            -> ( Measured (Html StoryMsg), List (Measured String) )
+                        mon cs rem =
+                            let
+                                cwdt =
+                                    (-) (cs |> Nonempty.toList |> List.map .width |> List.sum)
+                                        ((if i == 0 then
+                                            1
+                                          else
+                                            2
+                                         )
+                                            * Debug.log "" ellipses.width
+                                        )
 
-                                                    tr :: rem_ ->
-                                                        if tr.width + w < cwdt then
-                                                            go (tr :: revtrs) (tr.width + w) rem_
-                                                        else
-                                                            end
-                                    in
-                                        go [] 0 rem
-                                            |> \( trs, rem ) ->
-                                                ( mkBlock ( trs, z ) cs, rem )
-                                )
-                         in
-                            mon
-                        )
-                    >> traverseNonempty
-                    >> Helper.State2.runState trs
-                    >> Tuple.first
+                                prependEllipses trs =
+                                    if i == 0 || List.isEmpty trs then
+                                        trs
+                                    else
+                                        ellipses :: trs
+
+                                go :
+                                    List (Measured String)
+                                    -> Float
+                                    -> List (Measured String)
+                                    -> ( List (Measured String), List (Measured String) )
+                                go revtrs w rem =
+                                    case rem of
+                                        [] ->
+                                            ( prependEllipses (List.reverse revtrs), rem )
+
+                                        tr :: rem_ ->
+                                            if tr.width + w < cwdt then
+                                                go (tr :: revtrs) (tr.width + w) rem_
+                                            else
+                                                ( prependEllipses (List.reverse (ellipses :: revtrs)), rem )
+                            in
+                                go [] 0 rem
+                                    |> Tuple.mapFirst
+                                        (\trs -> mkBlock ( trs, z ) cs)
+                    in
+                        mon
+                )
+                >> traverseNonempty
+                >> Helper.State2.runState trs
+                >> Tuple.first
 
         mkBlock :
             ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )

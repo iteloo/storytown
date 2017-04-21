@@ -284,12 +284,14 @@ updateStoryPage { toMsg } message s =
                                 { title = sty.title
                                 , sentences =
                                     Trans.Raw <|
-                                        Left <|
+                                        ( Left <|
                                             Dict.fromList <|
                                                 List.indexedMap (,) <|
                                                     List.map
                                                         itemToSentence
                                                         sty.sentences
+                                        , Nothing
+                                        )
                                 }
                             )
                             story
@@ -367,13 +369,15 @@ updateStoryPage { toMsg } message s =
             updateSentences
                 (\para ->
                     case para of
-                        Trans.Formatted para ->
+                        Trans.Formatted formatted ->
                             Trans.Formatted <|
-                                Dict.update idx
-                                    (Maybe.map
-                                        (\sen -> { sen | collapsable = new })
+                                Tuple.mapFirst
+                                    (Dict.update idx
+                                        (Maybe.map
+                                            (\sen -> { sen | collapsable = new })
+                                        )
                                     )
-                                    para
+                                    formatted
 
                         _ ->
                             -- [todo] handle more gracefully
@@ -389,7 +393,7 @@ updateStoryPage { toMsg } message s =
                         (\story ->
                             ()
                                 ! case story.sentences of
-                                    Trans.Raw para ->
+                                    Trans.Raw ( para, ellipses ) ->
                                         List.concat
                                             [ let
                                                 both =
@@ -409,6 +413,14 @@ updateStoryPage { toMsg } message s =
                                             , [ Overflow.measure
                                                     Trans.WordsMeasure
                                               ]
+                                            , case ellipses of
+                                                Nothing ->
+                                                    [ Overflow.measure
+                                                        Trans.EllipsesMeasure
+                                                    ]
+
+                                                Just _ ->
+                                                    []
                                             ]
 
                                     _ ->
@@ -426,7 +438,7 @@ updateStoryPage { toMsg } message s =
                             |> Maybe.andThen
                                 (\story ->
                                     case story.sentences of
-                                        Trans.Formatted para ->
+                                        Trans.Formatted ( para, _ ) ->
                                             Dict.map
                                                 (\idx i ->
                                                     i.audioUrl
@@ -443,22 +455,28 @@ updateStoryPage { toMsg } message s =
                             |> Helper.maybeToList
                           )
 
-                check : Trans.Paragraph (Either a c) b -> Maybe (Trans.Paragraph c b)
+                check : ( Either (Trans.Paragraph (Either a c) b) (Trans.Paragraph (Either a c) (Trans.Measured b)), Maybe d ) -> Maybe ( Trans.Paragraph c (Trans.Measured b), d )
                 check =
-                    Dict.map
-                        (\_ sen ->
-                            sen.collapsable
-                                |> Trans.mapCollapsable Either.toMaybe Just
-                                >> TransMaybe.traverse
-                                >> Maybe.map (\col -> { sen | collapsable = col })
+                    Tuple.mapFirst
+                        (Either.fromEither
+                            (always Nothing)
+                            (Dict.map
+                                (\_ sen ->
+                                    sen.collapsable
+                                        |> Trans.mapCollapsable Either.toMaybe Just
+                                        >> TransMaybe.traverse
+                                        >> Maybe.map (\col -> { sen | collapsable = col })
+                                )
+                                >> Dict.foldr (Maybe.map2 << Dict.insert) (Just Dict.empty)
+                            )
                         )
-                        >> Dict.foldr (Maybe.map2 << Dict.insert) (Just Dict.empty)
+                        >> uncurry (Maybe.map2 (,))
             in
                 -- [todo] change this to measure the concatenation of items
                 updateSentences
                     (\layout ->
                         case layout of
-                            Trans.Raw para ->
+                            Trans.Raw ( para, ellipses ) ->
                                 case m of
                                     Trans.TransMeasure idx path ->
                                         let
@@ -505,13 +523,21 @@ updateStoryPage { toMsg } message s =
                                         in
                                             para
                                                 |> Either.fromEither
-                                                    (both >> Maybe.map (Left >> Trans.Raw) >> handleError)
+                                                    (both
+                                                        >> Maybe.map
+                                                            (Left
+                                                                >> (\a -> ( a, ellipses ))
+                                                                >> Trans.Raw
+                                                            )
+                                                        >> handleError
+                                                    )
                                                     (both
                                                         >> Maybe.map
                                                             (\para ->
-                                                                check para
+                                                                check ( Right para, ellipses )
                                                                     |> Maybe.map Trans.Formatted
-                                                                    |> Maybe.withDefault (para |> Right >> Trans.Raw)
+                                                                    |> Maybe.withDefault
+                                                                        (( Right para, ellipses ) |> Trans.Raw)
                                                             )
                                                         >> handleError
                                                     )
@@ -523,15 +549,38 @@ updateStoryPage { toMsg } message s =
                                                     |> Trans.markLeaves measurement
                                                     |> Maybe.map
                                                         (\para ->
-                                                            check para
+                                                            check ( Right para, ellipses )
                                                                 |> Maybe.map Trans.Formatted
-                                                                |> Maybe.withDefault (para |> Right >> Trans.Raw)
+                                                                |> Maybe.withDefault
+                                                                    (( Right para, ellipses ) |> Trans.Raw)
                                                         )
                                                     |> Maybe.withDefault
                                                         (Trans.LayoutError Trans.CannotZipWidths)
 
                                             x ->
-                                                Trans.Raw x
+                                                Trans.Raw ( x, ellipses )
+
+                                    Trans.EllipsesMeasure ->
+                                        case measurement of
+                                            [ { width } ] ->
+                                                let
+                                                    updated =
+                                                        ( para
+                                                        , Just
+                                                            { content = "..."
+                                                            , width =
+                                                                width
+                                                                -- [tmp] bogus?
+                                                            , isEnd = False
+                                                            }
+                                                        )
+                                                in
+                                                    check updated
+                                                        |> Maybe.map Trans.Formatted
+                                                        |> Maybe.withDefault (updated |> Trans.Raw)
+
+                                            _ ->
+                                                Trans.LayoutError Trans.CannotZipWidths
 
                             x ->
                                 -- [todo] think about this more

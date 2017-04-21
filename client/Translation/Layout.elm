@@ -34,7 +34,7 @@ type alias Paragraph a b =
 
 type alias ParagraphLayout =
     -- [todo] clean up namespace
-    Layout (Either (Paragraph (Either (List String) (List (Measured String))) Word) (Paragraph (Either (List String) (List (Measured String))) (Measured Word))) (Paragraph (List (Measured String)) (Measured Word)) ParagraphLayoutError
+    Layout ( Either (Paragraph (Either (List String) (List (Measured String))) Word) (Paragraph (Either (List String) (List (Measured String))) (Measured Word)), Maybe (Measured String) ) ( Paragraph (List (Measured String)) (Measured Word), Measured String ) ParagraphLayoutError
 
 
 type Layout a b e
@@ -61,6 +61,22 @@ type alias Measured a =
 type Measure
     = TransMeasure Int Path
     | WordsMeasure
+    | EllipsesMeasure
+
+
+transMeasureDiv : String
+transMeasureDiv =
+    "transMeasureDiv"
+
+
+wordsMeasureDiv : String
+wordsMeasureDiv =
+    "wordsMeasureDiv"
+
+
+ellipsesMeasureDiv : String
+ellipsesMeasureDiv =
+    "ellipsesMeasureDiv"
 
 
 toDivId : Measure -> String
@@ -68,7 +84,7 @@ toDivId m =
     case m of
         TransMeasure idx path ->
             String.concat
-                [ "transMeasureDiv"
+                [ transMeasureDiv
                 , toString idx
                 , "-"
                 , path
@@ -78,7 +94,10 @@ toDivId m =
                 ]
 
         WordsMeasure ->
-            "wordsMeasureDiv"
+            wordsMeasureDiv
+
+        EllipsesMeasure ->
+            ellipsesMeasureDiv
 
 
 fromDivId : String -> Maybe Measure
@@ -86,12 +105,14 @@ fromDivId =
     Combine.parse
         (Combine.choice
             [ TransMeasure
-                <$ string "transMeasureDiv"
+                <$ string transMeasureDiv
                 <*> int
                 <* string "-"
                 <*> ((::) <$> int <*> many (string "x" *> int))
             , WordsMeasure
-                <$ string "wordsMeasureDiv"
+                <$ string wordsMeasureDiv
+            , EllipsesMeasure
+                <$ string ellipsesMeasureDiv
             ]
             <* Combine.end
         )
