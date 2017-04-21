@@ -81,7 +81,7 @@ subs s =
                             case s.story of
                                 RD.Success sty ->
                                     case sty.sentences of
-                                        Trans.Raw _ ->
+                                        Trans.Measuring _ ->
                                             [ AnimationFrame.times
                                                 (ReadyMsg
                                                     << PageMsg
@@ -309,14 +309,14 @@ updateStoryPage { toMsg } message s =
                             (\sty ->
                                 { title = sty.title
                                 , sentences =
-                                    Trans.Raw <|
+                                    Trans.Measuring <|
                                         ( Left <|
                                             Dict.fromList <|
                                                 List.indexedMap (,) <|
                                                     List.map
                                                         itemToSentence
                                                         sty.sentences
-                                        , Nothing
+                                        , Left ".."
                                         )
                                 }
                             )
@@ -422,7 +422,7 @@ updateStoryPage { toMsg } message s =
                         (\story ->
                             ()
                                 ! case story.sentences of
-                                    Trans.Raw ( para, ellipses ) ->
+                                    Trans.Measuring ( para, ellipses ) ->
                                         List.concat
                                             [ let
                                                 both =
@@ -443,12 +443,12 @@ updateStoryPage { toMsg } message s =
                                                     Trans.WordsMeasure
                                               ]
                                             , case ellipses of
-                                                Nothing ->
+                                                Left _ ->
                                                     [ Overflow.measure
                                                         Trans.EllipsesMeasure
                                                     ]
 
-                                                Just _ ->
+                                                Right _ ->
                                                     []
                                             ]
 
@@ -484,7 +484,9 @@ updateStoryPage { toMsg } message s =
                             |> Helper.maybeToList
                           )
 
-                check : ( Either (Trans.Paragraph (Either a c) b) (Trans.Paragraph (Either a c) (Trans.Measured b)), Maybe d ) -> Maybe ( Trans.Paragraph c (Trans.Measured b), d )
+                check :
+                    ( Either (Trans.Paragraph (Either a c) b2) (Trans.Paragraph (Either a c) b), Either d2 d )
+                    -> Maybe ( Trans.Paragraph c b, d )
                 check =
                     Tuple.mapFirst
                         (Either.fromEither
@@ -499,13 +501,14 @@ updateStoryPage { toMsg } message s =
                                 >> Dict.foldr (Maybe.map2 << Dict.insert) (Just Dict.empty)
                             )
                         )
+                        >> Tuple.mapSecond Either.toMaybe
                         >> uncurry (Maybe.map2 (,))
             in
                 -- [todo] change this to measure the concatenation of items
                 updateSentences
                     (\layout ->
                         case layout of
-                            Trans.Raw ( para, ellipses ) ->
+                            Trans.Measuring ( para, ellipses ) ->
                                 case m of
                                     Trans.TransMeasure ( idx, path ) ->
                                         let
@@ -556,7 +559,7 @@ updateStoryPage { toMsg } message s =
                                                         >> Maybe.map
                                                             (Left
                                                                 >> (\a -> ( a, ellipses ))
-                                                                >> Trans.Raw
+                                                                >> Trans.Measuring
                                                             )
                                                         >> handleError
                                                     )
@@ -572,7 +575,7 @@ updateStoryPage { toMsg } message s =
                                                                                 }
                                                                         )
                                                                     |> Maybe.withDefault
-                                                                        (( Right para, ellipses ) |> Trans.Raw)
+                                                                        (( Right para, ellipses ) |> Trans.Measuring)
                                                             )
                                                         >> handleError
                                                     )
@@ -593,41 +596,46 @@ updateStoryPage { toMsg } message s =
                                                                             }
                                                                     )
                                                                 |> Maybe.withDefault
-                                                                    (( Right para, ellipses ) |> Trans.Raw)
+                                                                    (( Right para, ellipses ) |> Trans.Measuring)
                                                         )
                                                     |> Maybe.withDefault
                                                         (Trans.LayoutError Trans.CannotZipWidths)
 
-                                            x ->
-                                                Trans.Raw ( x, ellipses )
+                                            _ ->
+                                                layout
 
                                     Trans.EllipsesMeasure ->
-                                        case measurement of
-                                            [ { width } ] ->
-                                                let
-                                                    updated =
-                                                        ( para
-                                                        , Just
-                                                            { content = "..."
-                                                            , width =
-                                                                width
-                                                                -- [tmp] bogus?
-                                                            , isEnd = False
-                                                            }
-                                                        )
-                                                in
-                                                    check updated
-                                                        |> Maybe.map
-                                                            (\p ->
-                                                                Trans.Formatted
-                                                                    { paragraph = p
-                                                                    , hover = Nothing
+                                        case ellipses of
+                                            Left ellipses ->
+                                                case measurement of
+                                                    [ { width } ] ->
+                                                        let
+                                                            updated =
+                                                                ( para
+                                                                , Right
+                                                                    { content = ellipses
+                                                                    , width =
+                                                                        width
+                                                                        -- [tmp] bogus?
+                                                                    , isEnd = False
                                                                     }
-                                                            )
-                                                        |> Maybe.withDefault (updated |> Trans.Raw)
+                                                                )
+                                                        in
+                                                            check updated
+                                                                |> Maybe.map
+                                                                    (\p ->
+                                                                        Trans.Formatted
+                                                                            { paragraph = p
+                                                                            , hover = Nothing
+                                                                            }
+                                                                    )
+                                                                |> Maybe.withDefault (updated |> Trans.Measuring)
+
+                                                    _ ->
+                                                        Trans.LayoutError Trans.CannotZipWidths
 
                                             _ ->
-                                                Trans.LayoutError Trans.CannotZipWidths
+                                                layout
 
                             x ->
                                 -- [todo] think about this more

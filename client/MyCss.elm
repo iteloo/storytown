@@ -40,7 +40,7 @@ css =
                 pt 24
 
             transFontSize =
-                pt 20
+                pt 10
 
             green =
                 rgba 0 127 0
@@ -106,11 +106,13 @@ css =
                 , textAlign left
                 ]
             , class MeasurementDiv
-                [ fontSize origFontSize
+                [ property "visibility" "hidden"
+                , fontSize origFontSize
                 , textAlign left
                 ]
             , class SentenceMeasurementDiv
-                [ fontSize transFontSize
+                [ property "visibility" "hidden"
+                , fontSize transFontSize
                 , whiteSpace noWrap
                 , textAlign left
                 ]

@@ -32,7 +32,7 @@ styles =
 view : ParagraphLayout -> Html StoryMsg
 view layout =
     case layout of
-        Raw ( raw, ellipses ) ->
+        Measuring ( raw, ellipses ) ->
             div [] <|
                 List.concat
                     [ Either.fromEither
@@ -44,11 +44,11 @@ view layout =
                         paragraphMeasureDivs
                         raw
                     , case ellipses of
-                        Nothing ->
+                        Left ellipses ->
                             -- [tmp] hard-coded
-                            [ measureDiv EllipsesMeasure [ "..." ] ]
+                            [ measureDiv EllipsesMeasure [ ellipses ] ]
 
-                        Just _ ->
+                        Right _ ->
                             []
                     ]
 

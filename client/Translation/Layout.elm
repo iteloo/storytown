@@ -34,7 +34,7 @@ type alias Paragraph a b =
 
 type alias ParagraphLayout =
     -- [todo] clean up namespace
-    Layout ( Either (Paragraph (Either (List String) (List (Measured String))) Word) (Paragraph (Either (List String) (List (Measured String))) (Measured Word)), Maybe (Measured String) )
+    Layout ( Either (Paragraph (Either (List String) (List (Measured String))) Word) (Paragraph (Either (List String) (List (Measured String))) (Measured Word)), Either String (Measured String) )
         { paragraph : ( Paragraph (List (Measured String)) (Measured Word), Measured String )
         , hover : Maybe FullPath
         }
@@ -42,7 +42,7 @@ type alias ParagraphLayout =
 
 
 type Layout a b e
-    = Raw a
+    = Measuring a
     | Formatted b
     | LayoutError e
 
