@@ -9,6 +9,10 @@ import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 import Helper
 
 
+type alias FullPath =
+    ( Int, Path )
+
+
 type alias Path =
     List Int
 

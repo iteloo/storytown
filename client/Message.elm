@@ -6,6 +6,7 @@ import MediaRecorder as MR
 import Navigation as Nav
 import Translation.Base as Trans exposing (Collapsable, Word)
 import Translation.Layout as Trans exposing (Measured)
+import Translation.Path as Trans
 import Time
 import Bootstrap.Navbar as Navbar
 
@@ -53,6 +54,8 @@ type DashboardMsg
 type StoryMsg
     = -- UI
       TextClicked ItemId
+    | MouseEnter Trans.FullPath
+    | MouseLeave
       -- SERVER
     | StoryReceived (Web Api.Story)
       -- PLAYBACK

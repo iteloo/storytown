@@ -13,7 +13,7 @@ module Translation.Layout
         )
 
 import Translation.Base exposing (..)
-import Translation.Path exposing (Path)
+import Translation.Path exposing (FullPath)
 import Translation.StateTraverse
 import Helper.State as State exposing (State)
 import Either exposing (Either)
@@ -34,7 +34,11 @@ type alias Paragraph a b =
 
 type alias ParagraphLayout =
     -- [todo] clean up namespace
-    Layout ( Either (Paragraph (Either (List String) (List (Measured String))) Word) (Paragraph (Either (List String) (List (Measured String))) (Measured Word)), Maybe (Measured String) ) ( Paragraph (List (Measured String)) (Measured Word), Measured String ) ParagraphLayoutError
+    Layout ( Either (Paragraph (Either (List String) (List (Measured String))) Word) (Paragraph (Either (List String) (List (Measured String))) (Measured Word)), Maybe (Measured String) )
+        { paragraph : ( Paragraph (List (Measured String)) (Measured Word), Measured String )
+        , hover : Maybe FullPath
+        }
+        ParagraphLayoutError
 
 
 type Layout a b e
@@ -59,7 +63,7 @@ type alias Measured a =
 
 
 type Measure
-    = TransMeasure Int Path
+    = TransMeasure FullPath
     | WordsMeasure
     | EllipsesMeasure
 
@@ -82,7 +86,7 @@ ellipsesMeasureDiv =
 toDivId : Measure -> String
 toDivId m =
     case m of
-        TransMeasure idx path ->
+        TransMeasure ( idx, path ) ->
             String.concat
                 [ transMeasureDiv
                 , toString idx
@@ -105,10 +109,12 @@ fromDivId =
     Combine.parse
         (Combine.choice
             [ TransMeasure
-                <$ string transMeasureDiv
-                <*> int
-                <* string "-"
-                <*> ((::) <$> int <*> many (string "x" *> int))
+                <$> ((,)
+                        <$ string transMeasureDiv
+                        <*> int
+                        <* string "-"
+                        <*> ((::) <$> int <*> many (string "x" *> int))
+                    )
             , WordsMeasure
                 <$ string wordsMeasureDiv
             , EllipsesMeasure

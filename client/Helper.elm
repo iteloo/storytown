@@ -4,6 +4,21 @@ import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 import Helper.Cont as Cont exposing (Cont)
 
 
+isJust : Maybe a -> Bool
+isJust =
+    not << isNothing
+
+
+isNothing : Maybe a -> Bool
+isNothing m =
+    case m of
+        Nothing ->
+            True
+
+        Just _ ->
+            False
+
+
 maybeToList : Maybe a -> List a
 maybeToList =
     Maybe.map List.singleton >> Maybe.withDefault []

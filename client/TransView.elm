@@ -52,13 +52,18 @@ view layout =
                             []
                     ]
 
-        Formatted ( para, ellipses ) ->
-            para
-                |> Dict.map
-                    (\_ i ->
-                        { i | collapsable = registerCursors i.collapsable }
-                    )
-                |> splitParagraph ellipses
+        Formatted formatted ->
+            { formatted
+                | paragraph =
+                    Tuple.mapFirst
+                        (Dict.map
+                            (\_ i ->
+                                { i | collapsable = registerCursors i.collapsable }
+                            )
+                        )
+                        formatted.paragraph
+            }
+                |> splitParagraph
 
         LayoutError e ->
             -- [todo] handle more gracefully
@@ -72,7 +77,7 @@ paragraphMeasureDivs =
     List.concatMap
         (\( idx, sen ) ->
             nodes <|
-                pathedMap (measureDiv << TransMeasure idx) <|
+                pathedMap (measureDiv << TransMeasure << ((,) idx)) <|
                     mapCollapsable
                         (Either.fromEither identity (List.map .content))
                         identity
@@ -113,7 +118,7 @@ measureDiv m =
         [ Html.Attributes.id (toDivId m)
         , class
             [ case m of
-                TransMeasure _ _ ->
+                TransMeasure _ ->
                     SentenceMeasurementDiv
 
                 WordsMeasure ->
@@ -127,33 +132,51 @@ measureDiv m =
 
 
 splitParagraph :
-    Measured String
-    -> Paragraph ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word)
+    { paragraph : ( Paragraph ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word), Measured String )
+    , hover : Maybe FullPath
+    }
     -> Html StoryMsg
-splitParagraph ellipses =
-    div [ class [ FakeTable ] ]
-        << List.map
-            (div [ class [ FakeRow ] ]
-                << Nonempty.toList
-                << Nonempty.map .content
-            )
-        << Helper.truncateListAfter .isEnd
-        << List.concat
-        << Dict.values
-        << Dict.map
-            (\idx ->
-                Nonempty.toList
-                    << splitCollapsable ellipses idx
-                    << .collapsable
-            )
+splitParagraph { paragraph, hover } =
+    let
+        ( para, ellipses ) =
+            paragraph
+    in
+        div [ class [ FakeTable ] ]
+            << List.map
+                (div [ class [ FakeRow ] ]
+                    << Nonempty.toList
+                    << Nonempty.map .content
+                )
+            << Helper.truncateListAfter .isEnd
+            << List.concat
+            << Dict.values
+            << Dict.map
+                (\idx ->
+                    Nonempty.toList
+                        << splitCollapsable ellipses
+                            idx
+                            (hover
+                                |> Maybe.andThen
+                                    (\( idxpath, path ) ->
+                                        if idxpath == idx then
+                                            Just path
+                                        else
+                                            Nothing
+                                    )
+                            )
+                        << .collapsable
+                )
+        <|
+            para
 
 
 splitCollapsable :
     Measured String
     -> Int
+    -> Maybe Path
     -> Collapsable ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word)
     -> Nonempty (Measured (Html StoryMsg))
-splitCollapsable ellipses idx =
+splitCollapsable ellipses idx hover =
     let
         wordView : Measured Word -> Nonempty (Measured (Html msg))
         wordView w =
@@ -168,10 +191,10 @@ splitCollapsable ellipses idx =
                 }
 
         splitTrans :
-            ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
+            ( Path, ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) )
             -> Nonempty (Nonempty (Measured (Html StoryMsg)))
             -> Nonempty (Measured (Html StoryMsg))
-        splitTrans ( trs, z ) =
+        splitTrans ( path, ( trs, z ) ) =
             Nonempty.indexedMap
                 (\i ->
                     let
@@ -188,7 +211,7 @@ splitCollapsable ellipses idx =
                                           else
                                             2
                                          )
-                                            * Debug.log "" ellipses.width
+                                            * ellipses.width
                                         )
 
                                 prependEllipses trs =
@@ -215,7 +238,7 @@ splitCollapsable ellipses idx =
                             in
                                 go [] 0 rem
                                     |> Tuple.mapFirst
-                                        (\trs -> mkBlock ( trs, z ) cs)
+                                        (\trs -> mkBlock path ( trs, z ) cs)
                     in
                         mon
                 )
@@ -224,16 +247,23 @@ splitCollapsable ellipses idx =
                 >> Tuple.first
 
         mkBlock :
-            ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
+            Path
+            -> ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
             -> Nonempty (Measured (Html StoryMsg))
             -> Measured (Html StoryMsg)
-        mkBlock trz mbs =
+        mkBlock path trz mbs =
             let
                 width =
                     List.sum (List.map .width <| Nonempty.toList mbs)
             in
                 { content =
-                    genericBlockView idx
+                    genericBlockView
+                        idx
+                        path
+                        (hover
+                            |> Maybe.map ((==) path)
+                            |> Maybe.withDefault False
+                        )
                         -- [tmp] doesn't split trans
                         (Tuple.mapFirst
                             (List.foldr (++) "" << List.map .content)
@@ -246,7 +276,7 @@ splitCollapsable ellipses idx =
                 }
 
         expandedBlock :
-            ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
+            ( Path, ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) )
             -> AtLeastOneOf (Nonempty (Measured (Html StoryMsg))) (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
         expandedBlock trzs =
@@ -257,7 +287,7 @@ splitCollapsable ellipses idx =
                 << AtLeastOneOf.map identity wordView
 
         terminalBlock :
-            ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
+            ( Path, ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) )
             -> Nonempty (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
         terminalBlock trzs =
@@ -267,7 +297,7 @@ splitCollapsable ellipses idx =
 
         -- [note] identical to expandedBlock right now
         collapsedBlock :
-            ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
+            ( Path, ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) )
             -> AtLeastOneOf (Nonempty (Measured (Html StoryMsg))) (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
         collapsedBlock trzs =
@@ -284,6 +314,7 @@ splitCollapsable ellipses idx =
             expandedBlock
             terminalBlock
             collapsedBlock
+            << pathedMap (,)
 
 
 {-| [todo] move this into the main view code to avoid using Maybe
@@ -320,11 +351,13 @@ registerCursors =
 
 genericBlockView :
     Int
+    -> Path
+    -> Bool
     -> ( String, Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
     -> Float
     -> List (Html StoryMsg)
     -> Html StoryMsg
-genericBlockView idx ( tr, z ) width childViews =
+genericBlockView idx path isHover ( tr, z ) width childViews =
     div
         [ class [ FakeCell ]
         , styles [ Css.width (Css.px width) ]
@@ -338,7 +371,26 @@ genericBlockView idx ( tr, z ) width childViews =
 
                     Just _ ->
                         [ div [ class [ SidePadding ] ]
-                            [ div [ class <| addMin z [ Hoverarea ] ] <|
+                            [ div
+                                (List.concat
+                                    [ [ class <|
+                                            addMin z <|
+                                                List.concat
+                                                    [ [ Hoverarea ]
+                                                    , if isHover then
+                                                        [ Hover ]
+                                                      else
+                                                        []
+                                                    ]
+                                      , onMouseEnter (MouseEnter ( idx, path ))
+                                      ]
+                                    , if isHover then
+                                        [ onMouseLeave MouseLeave ]
+                                      else
+                                        []
+                                    ]
+                                )
+                              <|
                                 addCollapse idx z <|
                                     addExpand idx z <|
                                         [ div [ class [ Padding ] ]

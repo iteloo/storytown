@@ -26,6 +26,7 @@ type CssClass
     | Padding
     | Trans
     | Hoverarea
+    | Hover
     | Min
     | Expand
     | Collapse
@@ -143,7 +144,7 @@ css =
                         , maxHeight zero
                         , overflow hidden
                         ]
-                    , hover
+                    , withClass Hover
                         [ children
                             [ class Padding
                                 [ backgroundColor (green 0.1) ]

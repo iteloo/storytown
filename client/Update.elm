@@ -256,6 +256,32 @@ updateStoryPage { toMsg } message s =
         TextClicked itemId ->
             s ! [ Audio.jumpTo itemId ]
 
+        MouseEnter fullpath ->
+            updateSentences
+                (\ss ->
+                    case ss of
+                        Trans.Formatted formatted ->
+                            Trans.Formatted
+                                { formatted | hover = Just fullpath }
+
+                        x ->
+                            x
+                )
+                s
+
+        MouseLeave ->
+            updateSentences
+                (\ss ->
+                    case ss of
+                        Trans.Formatted formatted ->
+                            Trans.Formatted
+                                { formatted | hover = Nothing }
+
+                        x ->
+                            x
+                )
+                s
+
         -- SERVER
         StoryReceived story ->
             let
@@ -371,13 +397,16 @@ updateStoryPage { toMsg } message s =
                     case para of
                         Trans.Formatted formatted ->
                             Trans.Formatted <|
-                                Tuple.mapFirst
-                                    (Dict.update idx
-                                        (Maybe.map
-                                            (\sen -> { sen | collapsable = new })
-                                        )
-                                    )
-                                    formatted
+                                { formatted
+                                    | paragraph =
+                                        Tuple.mapFirst
+                                            (Dict.update idx
+                                                (Maybe.map
+                                                    (\sen -> { sen | collapsable = new })
+                                                )
+                                            )
+                                            formatted.paragraph
+                                }
 
                         _ ->
                             -- [todo] handle more gracefully
@@ -402,7 +431,7 @@ updateStoryPage { toMsg } message s =
                                                             Trans.pathedMap
                                                                 (\path _ ->
                                                                     Overflow.measure
-                                                                        (Trans.TransMeasure idx path)
+                                                                        (Trans.TransMeasure ( idx, path ))
                                                                 )
                                                                 ss.collapsable
                                                         )
@@ -438,13 +467,13 @@ updateStoryPage { toMsg } message s =
                             |> Maybe.andThen
                                 (\story ->
                                     case story.sentences of
-                                        Trans.Formatted ( para, _ ) ->
+                                        Trans.Formatted { paragraph } ->
                                             Dict.map
                                                 (\idx i ->
                                                     i.audioUrl
                                                         |> Maybe.map (flip (,) idx)
                                                 )
-                                                para
+                                                (Tuple.first paragraph)
                                                 |> Dict.values
                                                 |> Helper.sequenceMaybe
 
@@ -478,7 +507,7 @@ updateStoryPage { toMsg } message s =
                         case layout of
                             Trans.Raw ( para, ellipses ) ->
                                 case m of
-                                    Trans.TransMeasure idx path ->
+                                    Trans.TransMeasure ( idx, path ) ->
                                         let
                                             both para =
                                                 Dict.get idx para
@@ -535,7 +564,13 @@ updateStoryPage { toMsg } message s =
                                                         >> Maybe.map
                                                             (\para ->
                                                                 check ( Right para, ellipses )
-                                                                    |> Maybe.map Trans.Formatted
+                                                                    |> Maybe.map
+                                                                        (\p ->
+                                                                            Trans.Formatted
+                                                                                { paragraph = p
+                                                                                , hover = Nothing
+                                                                                }
+                                                                        )
                                                                     |> Maybe.withDefault
                                                                         (( Right para, ellipses ) |> Trans.Raw)
                                                             )
@@ -550,7 +585,13 @@ updateStoryPage { toMsg } message s =
                                                     |> Maybe.map
                                                         (\para ->
                                                             check ( Right para, ellipses )
-                                                                |> Maybe.map Trans.Formatted
+                                                                |> Maybe.map
+                                                                    (\p ->
+                                                                        Trans.Formatted
+                                                                            { paragraph = p
+                                                                            , hover = Nothing
+                                                                            }
+                                                                    )
                                                                 |> Maybe.withDefault
                                                                     (( Right para, ellipses ) |> Trans.Raw)
                                                         )
@@ -576,7 +617,13 @@ updateStoryPage { toMsg } message s =
                                                         )
                                                 in
                                                     check updated
-                                                        |> Maybe.map Trans.Formatted
+                                                        |> Maybe.map
+                                                            (\p ->
+                                                                Trans.Formatted
+                                                                    { paragraph = p
+                                                                    , hover = Nothing
+                                                                    }
+                                                            )
                                                         |> Maybe.withDefault (updated |> Trans.Raw)
 
                                             _ ->
