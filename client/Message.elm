@@ -23,7 +23,7 @@ type Msg
 
 
 type NotReadyMsg
-    = UserReceived Api.User
+    = UserReceived (Maybe Api.User)
 
 
 type ReadyMsg
@@ -56,6 +56,7 @@ type LoginMsg
     | LoginButton
       -- SERVER
     | AuthDataReceived Api.AuthData
+    | LoginFailed
 
 
 type DashboardMsg

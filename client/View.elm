@@ -21,6 +21,7 @@ import Bootstrap.Form.Input as Input
 import Bootstrap.Button as Button
 import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Grid.Col as Col
+import Bootstrap.Alert as Alert
 import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 import Html.CssHelpers
 
@@ -58,7 +59,7 @@ appView s =
                     landingView
 
                 LoginPage s ->
-                    Html.map LoginMsg loginView
+                    Html.map LoginMsg (loginView s)
 
                 SignupPage s ->
                     Html.map SignupMsg (signupView s)
@@ -131,32 +132,54 @@ landingView =
         ]
 
 
-loginView : Html LoginMsg
-loginView =
-    Grid.container []
-        [ Form.form []
-            [ h2 [] [ text "Please sign in" ]
-            , Input.email
-                [ Input.attrs [ placeholder "email" ]
-                , Input.onInput UsernameInputChange
-                ]
-            , Input.password
-                [ Input.attrs [ placeholder "password" ]
-                , Input.onInput PasswordInputChange
-                ]
-            , br [] []
-            , Button.button
-                [ Button.primary
-                , Button.success
-                , Button.large
-                , Button.block
-                , Button.attrs [ onClick LoginButton ]
-                ]
-                [ text "login" ]
+loginView : LoginModel -> Html LoginMsg
+loginView s =
+    let
+        row html =
+            Form.row [] [ Form.col [] [ html ] ]
+    in
+        Grid.container []
+            [ Form.form [] <|
+                List.concat
+                    [ [ row <| h2 [] [ text "Please sign in with your email" ] ]
+                    , if s.loginError then
+                        [ row <|
+                            Alert.danger
+                                [ text <|
+                                    String.concat
+                                        [ "Cannot login. "
+                                        , "Please check your email and password "
+                                        , "and try again."
+                                        ]
+                                ]
+                        ]
+                      else
+                        []
+                    , [ row <|
+                            Input.email
+                                [ Input.attrs [ placeholder "you@example.com" ]
+                                , Input.onInput UsernameInputChange
+                                ]
+                      , row <|
+                            Input.password
+                                [ Input.attrs [ placeholder "password" ]
+                                , Input.onInput PasswordInputChange
+                                ]
+                      , row <|
+                            Button.button
+                                [ Button.primary
+                                , Button.success
+                                , Button.large
+                                , Button.block
+                                , Button.attrs [ onClick LoginButton ]
+                                ]
+                                [ text "login" ]
+                      ]
+                    ]
             ]
-        ]
 
 
+formValid : SignupModel -> Bool
 formValid s =
     List.all (not << String.isEmpty)
         [ s.firstnameInput
@@ -166,6 +189,7 @@ formValid s =
         && (s.passwordInput == s.confirmInput)
 
 
+passwordValid : SignupModel -> Bool
 passwordValid s =
     String.isEmpty s.confirmInput || (s.passwordInput == s.confirmInput)
 

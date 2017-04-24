@@ -37,7 +37,11 @@ init loc =
             , user = Nothing
             }
     }
-        ! [ Server.send (NotReadyMsg << UserReceived) Api.getApiUser ]
+        ! [ Server.sendOnAuthError
+                (NotReadyMsg (UserReceived Nothing))
+                (NotReadyMsg << UserReceived << Just)
+                Api.getApiUser
+          ]
 
 
 initReady : PageModel -> ( ReadyModel, Cmd Msg )
@@ -129,12 +133,14 @@ update message s =
             case s.app of
                 NotReady nr ->
                     case msg of
-                        UserReceived user ->
+                        UserReceived muser ->
                             { s
                                 | app =
                                     NotReady
                                         { nr
-                                            | user = Just (apiUserToUser user)
+                                            | user =
+                                                Maybe.map apiUserToUser
+                                                    muser
                                         }
                             }
                                 ! []
@@ -227,7 +233,8 @@ updateLogin { toMsg } msg s =
 
         LoginButton ->
             s
-                ! [ Server.send
+                ! [ Server.sendOnAuthError
+                        (toMsg LoginFailed)
                         (toMsg << AuthDataReceived)
                         (Api.postLogin
                             (Api.Login s.usernameInput s.passwordInput)
@@ -239,6 +246,9 @@ updateLogin { toMsg } msg s =
             { s | user = Just (apiUserToUser authUnsafe.user) }
                 ! []
                 :> gotoRoute (Maybe.withDefault Routing.Dashboard s.redirect)
+
+        LoginFailed ->
+            { s | loginError = True } ! []
 
 
 updateSignup :

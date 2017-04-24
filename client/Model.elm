@@ -57,6 +57,7 @@ type alias LoginModel =
     { usernameInput : String
     , passwordInput : String
     , redirect : Maybe Routing.Route
+    , loginError : Bool
     , user : Maybe User
     }
 
@@ -66,6 +67,7 @@ initLogin =
     { usernameInput = ""
     , passwordInput = ""
     , redirect = Nothing
+    , loginError = False
     , user = Nothing
     }
 

@@ -1,4 +1,4 @@
-module Server exposing (send, sendW)
+module Server exposing (send, sendW, sendOnAuthError)
 
 import Message exposing (Msg(..))
 import Model exposing (..)
@@ -14,7 +14,7 @@ send :
     -> HttpB.RequestBuilder a
     -> Cmd Msg
 send tag =
-    sendWithCsrfToken (handleHttpError tag Nothing)
+    sendWithCsrfToken (handleHttpError Nothing tag Nothing)
 
 
 sendW :
@@ -23,10 +23,19 @@ sendW :
     -> Cmd Msg
 sendW tag =
     sendWithCsrfToken
-        (handleHttpError
+        (handleHttpError Nothing
             (tag << RD.succeed)
             (Just (tag << RD.Failure << always ()))
         )
+
+
+sendOnAuthError :
+    Msg
+    -> (a -> Msg)
+    -> HttpB.RequestBuilder a
+    -> Cmd Msg
+sendOnAuthError onAuthError tag =
+    sendWithCsrfToken (handleHttpError (Just onAuthError) tag Nothing)
 
 
 sendWithCsrfToken :
@@ -53,11 +62,12 @@ sendWithCsrfToken handler req =
 
 
 handleHttpError :
-    (a -> Msg)
+    Maybe Msg
+    -> (a -> Msg)
     -> Maybe (Http.Error -> Msg)
     -> Result Http.Error a
     -> Msg
-handleHttpError tag tagE r =
+handleHttpError handleAuthError tag tagE r =
     case r of
         Ok a ->
             tag a
@@ -66,7 +76,12 @@ handleHttpError tag tagE r =
             case Debug.log "error" e of
                 Http.BadStatus resp ->
                     if resp.status.code == 401 then
-                        UnauthorizedError
+                        case handleAuthError of
+                            Nothing ->
+                                UnauthorizedError
+
+                            Just handler ->
+                                handler
                     else
                         Maybe.withDefault showError tagE e
 

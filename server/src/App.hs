@@ -111,31 +111,37 @@ checkCreds :: CookieSettings -> JWTSettings -> Login
           '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie]
           AuthData
         )
-checkCreds cookieSettings jwtSettings (Login "" "") = do
-     let usr = User {
-       firstName = "Ali"
-     , lastName = "Baba"
-     , email = "ali@email.com"
-     , group = "Teacher"
-     }
-     mcookie <- liftIO $ makeCookie cookieSettings jwtSettings usr
-     csrfCookie <- do
-       csrf <- liftIO $ BS64.encode <$> System.Entropy.getEntropy 32
-       return Cookie.def {
-          Cookie.setCookieName = xsrfCookieName cookieSettings
-        , Cookie.setCookieValue = csrf
-        , Cookie.setCookieSecure = True
-        , Cookie.setCookiePath = xsrfCookiePath cookieSettings
-        }
-     case mcookie of
-       Nothing     -> throwError err401
-       Just cookie -> return
-        $ addHeader csrfCookie
-        $ addHeader cookie
-        AuthData {
-            user = usr
-        }
-checkCreds _ _ _ = throwError err401
+checkCreds cookieSettings jwtSettings (Login email pw) = do
+    mdUser <- (DB.entityVal <$>) <$> runDb (DB.getBy (UniqueEmail email))
+    case mdUser of
+      Nothing -> throwError err401
+      Just dUser ->
+        if dUserPassword dUser == pw then do
+          let user = User {
+              firstName = dUserFirstName dUser
+            , lastName = dUserLastName dUser
+            , email = dUserEmail dUser
+            , group = dUserGroup dUser
+          }
+          -- [hack] useless data in jwt
+          mcookie <- liftIO $ makeCookie cookieSettings jwtSettings user
+          csrfCookie <- do
+            csrf <- liftIO $ BS64.encode <$> System.Entropy.getEntropy 32
+            return Cookie.def {
+                Cookie.setCookieName = xsrfCookieName cookieSettings
+              , Cookie.setCookieValue = csrf
+              , Cookie.setCookieSecure = True
+              , Cookie.setCookiePath = xsrfCookiePath cookieSettings
+              }
+          case mcookie of
+            Nothing     -> throwError err401
+            Just cookie -> return
+              $ addHeader csrfCookie
+              $ addHeader cookie
+              AuthData {
+                user = user
+              }
+        else throwError err401
 
 
 -- S3 signing
