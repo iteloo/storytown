@@ -1,5 +1,6 @@
 module TransView exposing (view)
 
+import Model exposing (..)
 import Message exposing (..)
 import MyCss exposing (CssClass(..))
 import Translation.Base exposing (..)
@@ -29,9 +30,9 @@ styles =
     Css.asPairs >> Html.Attributes.style
 
 
-view : ParagraphLayout -> Html StoryMsg
-view layout =
-    case layout of
+view : StoryState -> Maybe Int -> Html StoryMsg
+view { sentences } curIdx =
+    case sentences of
         Measuring ( raw, ellipses ) ->
             div [] <|
                 List.concat
@@ -63,7 +64,7 @@ view layout =
                         )
                         formatted.paragraph
             }
-                |> splitParagraph
+                |> splitParagraph curIdx
 
         LayoutError e ->
             -- [todo] handle more gracefully
@@ -132,11 +133,12 @@ measureDiv m =
 
 
 splitParagraph :
-    { paragraph : ( Paragraph ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word), Measured String )
-    , hover : Maybe FullPath
-    }
+    Maybe Int
+    -> { paragraph : ( Paragraph ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word), Measured String )
+       , hover : Maybe FullPath
+       }
     -> Html StoryMsg
-splitParagraph { paragraph, hover } =
+splitParagraph curIdx { paragraph, hover } =
     let
         ( para, ellipses ) =
             paragraph
@@ -153,8 +155,13 @@ splitParagraph { paragraph, hover } =
             << Dict.map
                 (\idx ->
                     Nonempty.toList
-                        << splitCollapsable ellipses
+                        << splitCollapsable
+                            ellipses
                             idx
+                            (curIdx
+                                |> Maybe.map ((==) idx)
+                                |> Maybe.withDefault False
+                            )
                             (hover
                                 |> Maybe.andThen
                                     (\( idxpath, path ) ->
@@ -173,12 +180,13 @@ splitParagraph { paragraph, hover } =
 splitCollapsable :
     Measured String
     -> Int
+    -> Bool
     -> Maybe Path
     -> Collapsable ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word)
     -> Nonempty (Measured (Html StoryMsg))
-splitCollapsable ellipses idx hover =
+splitCollapsable ellipses idx marked hover =
     let
-        wordView : Measured Word -> Nonempty (Measured (Html msg))
+        wordView : Measured Word -> Nonempty (Measured (Html StoryMsg))
         wordView w =
             Nonempty.fromElement <|
                 { w
@@ -187,7 +195,16 @@ splitCollapsable ellipses idx hover =
                             [ class [ FakeCell, Orig ]
                             , styles [ Css.width (Css.px w.width) ]
                             ]
-                            [ text w.content ]
+                            [ let
+                                txt =
+                                    a [ onClick (TextClicked idx) ]
+                                        [ text w.content ]
+                              in
+                                if marked then
+                                    mark [] [ txt ]
+                                else
+                                    txt
+                            ]
                 }
 
         splitTrans :

@@ -328,7 +328,8 @@ storyView s =
                 text "Cannot load..."
 
             RD.Success story ->
-                TransView.view story.sentences
+                TransView.view story
+                    (currentItemState s.playbackState |> Maybe.map .itemId)
         ]
 
 

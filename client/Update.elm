@@ -314,8 +314,9 @@ updateStoryPage :
 updateStoryPage { toMsg } message s =
     case message of
         -- UI
-        TextClicked itemId ->
-            s ! [ Audio.jumpTo itemId ]
+        TextClicked idx ->
+            -- [tmp] behaviour when not playing remains to be checked
+            s ! [ Audio.jumpTo idx ]
 
         MouseEnter fullpath ->
             updateSentences
