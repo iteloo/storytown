@@ -32,10 +32,21 @@ type ReadyMsg
 
 
 type PageMsg
-    = LoginMsg LoginMsg
+    = SignupMsg SignupMsg
+    | LoginMsg LoginMsg
     | DashboardMsg DashboardMsg
     | StoryMsg StoryMsg
     | StoryEditMsg StoryEditMsg
+
+
+type SignupMsg
+    = EmailInputChange String
+    | FirstnameInputChange String
+    | LastnameInputChange String
+    | SPasswordInputChange String
+    | ConfirmInputChange String
+    | SignupButton
+    | SignupResult (Maybe String)
 
 
 type LoginMsg

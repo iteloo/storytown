@@ -101,7 +101,9 @@ protected e =
     throwAll err401
 
 unprotected :: CookieSettings -> JWTSettings -> MyServer Unprotected
-unprotected = checkCreds
+unprotected cookieSettings jwtSettings =
+       checkCreds cookieSettings jwtSettings
+  :<|> signup
 
 checkCreds :: CookieSettings -> JWTSettings -> Login
     -> MyHandler
@@ -111,8 +113,7 @@ checkCreds :: CookieSettings -> JWTSettings -> Login
         )
 checkCreds cookieSettings jwtSettings (Login "" "") = do
      let usr = User {
-       userId = 0
-     , firstName = "Ali"
+       firstName = "Ali"
      , lastName = "Baba"
      , email = "ali@email.com"
      , group = "Teacher"
@@ -155,6 +156,20 @@ getSignedPutObjectRequest dir = do
 -- DB HANDLER
 
 runDb query = asks pool >>= liftIO . DB.runSqlPool query
+
+-- SIGN UP
+
+signup :: Signup -> MyHandler (Maybe String)
+signup signupData = runDb $ do
+  let email = signupEmail signupData
+  fmap (const email) <$> DB.insertUnique DUser {
+      dUserEmail = email
+    , dUserPassword = signupPassword signupData
+    , dUserFirstName = signupFirstName signupData
+    , dUserLastName = signupLastName signupData
+    -- [tmp] always student
+    , dUserGroup = userGroupToUnsafe Student
+  }
 
 
 -- STORY HANDLERS

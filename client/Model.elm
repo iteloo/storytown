@@ -36,10 +36,21 @@ type alias ReadyModel =
 
 
 type PageModel
-    = LoginPage LoginModel
+    = LandingPage LandingModel
+    | LoginPage LoginModel
+    | SignupPage SignupModel
     | Dashboard DashboardModel
     | StoryPage StoryModel
     | StoryEditPage StoryEditModel
+
+
+type alias LandingModel =
+    { user : Maybe User }
+
+
+initLanding : Maybe User -> LandingModel
+initLanding user =
+    { user = user }
 
 
 type alias LoginModel =
@@ -62,6 +73,27 @@ initLogin =
 initLoginWithUser : User -> LoginModel
 initLoginWithUser user =
     { initLogin | user = Just user }
+
+
+type alias SignupModel =
+    { emailInput : String
+    , firstnameInput : String
+    , lastnameInput : String
+    , passwordInput : String
+    , confirmInput : String
+    , user : Maybe User
+    }
+
+
+initSignup : Maybe User -> SignupModel
+initSignup user =
+    { emailInput = ""
+    , firstnameInput = ""
+    , lastnameInput = ""
+    , passwordInput = ""
+    , confirmInput = ""
+    , user = user
+    }
 
 
 type alias DashboardModel =
@@ -134,9 +166,12 @@ type alias ItemId =
     Int
 
 
+type alias UserId =
+    Int
+
+
 type alias User =
-    { userId : Int
-    , firstName : String
+    { firstName : String
     , lastName : String
     , email : String
     , group : UserGroup
@@ -163,8 +198,7 @@ apiUserToUser apiUser =
                     Debug.crash
                         ("Cannot decode UserGroup value :" ++ str)
     in
-        { userId = apiUser.userId
-        , firstName = apiUser.firstName
+        { firstName = apiUser.firstName
         , lastName = apiUser.lastName
         , email = apiUser.email
         , group = toSafe apiUser.group

@@ -20,6 +20,7 @@ import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Button as Button
 import Bootstrap.ListGroup as ListGroup
+import Bootstrap.Grid.Col as Col
 import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 import Html.CssHelpers
 
@@ -53,8 +54,14 @@ appView s =
         [ menu s.navState
         , Html.map PageMsg <|
             case s.page of
+                LandingPage s ->
+                    landingView
+
                 LoginPage s ->
                     Html.map LoginMsg loginView
+
+                SignupPage s ->
+                    Html.map SignupMsg (signupView s)
 
                 Dashboard s ->
                     Html.map DashboardMsg (dashboardView s)
@@ -96,6 +103,34 @@ menu s =
 --         ]
 
 
+landingView : Html msg
+landingView =
+    Grid.container []
+        [ h2 []
+            [ text <|
+                String.concat
+                    [ "Welcome to storytown. "
+                    , "You can enjoy reading "
+                    , "some interlinear text here. "
+                    ]
+            ]
+        , Button.linkButton
+            [ Button.success
+            , Button.large
+            , Button.block
+            , Button.attrs [ href (Routing.makePath Routing.Login) ]
+            ]
+            [ text "Login" ]
+        , Button.linkButton
+            [ Button.success
+            , Button.large
+            , Button.block
+            , Button.attrs [ href (Routing.makePath Routing.Signup) ]
+            ]
+            [ text "Sign up" ]
+        ]
+
+
 loginView : Html LoginMsg
 loginView =
     Grid.container []
@@ -120,6 +155,75 @@ loginView =
                 [ text "login" ]
             ]
         ]
+
+
+formValid s =
+    List.all (not << String.isEmpty)
+        [ s.firstnameInput
+        , s.lastnameInput
+        , s.passwordInput
+        ]
+        && (s.passwordInput == s.confirmInput)
+
+
+passwordValid s =
+    String.isEmpty s.confirmInput || (s.passwordInput == s.confirmInput)
+
+
+signupView : SignupModel -> Html SignupMsg
+signupView s =
+    let
+        row el label ph msg =
+            Form.row []
+                [ Form.colLabel [ Col.sm2 ] [ text label ]
+                , Form.col [ Col.sm10 ]
+                    [ el
+                        [ Input.attrs [ placeholder ph ]
+                        , Input.onInput msg
+                        ]
+                    ]
+                ]
+    in
+        Grid.container []
+            [ Form.form []
+                [ h2 [] [ text "Sign up" ]
+                , row Input.email "Email" "required" EmailInputChange
+                , row Input.text "First name" "required" FirstnameInputChange
+                , row Input.text "Last name" "required" LastnameInputChange
+                , row Input.password "Password" "required" SPasswordInputChange
+                , Form.row
+                    (List.concat
+                        [ if passwordValid s then
+                            []
+                          else
+                            [ Form.rowWarning ]
+                        ]
+                    )
+                    [ Form.colLabel [ Col.sm2 ] [ text "Confirm password" ]
+                    , Form.col [ Col.sm10 ]
+                        [ Input.password <|
+                            List.concat
+                                [ [ Input.attrs [ placeholder "required" ]
+                                  , Input.onInput ConfirmInputChange
+                                  ]
+                                , if passwordValid s then
+                                    []
+                                  else
+                                    [ Input.warning ]
+                                ]
+                        ]
+                    ]
+                , Button.button
+                    [ Button.primary
+                    , Button.success
+                    , Button.large
+                    , Button.block
+                    , Button.disabled (not (formValid s))
+                    , Button.attrs [ onClick SignupButton ]
+                    ]
+                    [ text "Sign up" ]
+                ]
+            ]
 
 
 

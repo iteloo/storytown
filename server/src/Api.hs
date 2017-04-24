@@ -31,6 +31,7 @@ DUser
     firstName Text
     lastName Text
     email String
+    UniqueEmail email
     password String
     group String
     deriving Show
@@ -58,8 +59,7 @@ instance FromJSON Item
 instance ElmType Item
 
 data User = User {
-    userId    :: UserId
-  , firstName :: Text
+    firstName :: Text
   , lastName  :: Text
   , email     :: String
   , group     :: UserGroupUnsafe
@@ -88,6 +88,17 @@ data Login = Login {
 instance ToJSON Login
 instance FromJSON Login
 instance ElmType Login
+
+data Signup = Signup {
+    signupEmail     :: String
+  , signupPassword  :: String
+  , signupFirstName :: Text
+  , signupLastName  :: Text
+} deriving (Eq, Show, Read, Generic)
+
+instance ToJSON Signup
+instance FromJSON Signup
+instance ElmType Signup
 
 newtype AuthData = AuthData {
     user :: User
@@ -132,6 +143,7 @@ type Unprotected =
       (Headers
         '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie]
         AuthData)
+  :<|> "signup" :> ReqBody '[JSON] Signup :> Post '[JSON] (Maybe String)
 
 type StoryApi =
        Get '[JSON] [(StoryId, Story)]

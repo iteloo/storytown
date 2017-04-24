@@ -15,7 +15,9 @@ type alias StoryId =
 
 
 type Route
-    = Login
+    = Landing
+    | Login
+    | Signup
     | Story StoryId
     | StoryEdit StoryId
     | StoryNew
@@ -30,10 +32,12 @@ parsePath =
 route : Url.Parser (Route -> a) a
 route =
     Url.oneOf
-        [ Url.map Story (s "story" </> int)
+        [ Url.map Landing top
+        , Url.map Login (s "login")
+        , Url.map Signup (s "signup")
+        , Url.map Story (s "story" </> int)
         , Url.map StoryEdit (s "story" </> s "edit" </> int)
         , Url.map StoryNew (s "story" </> s "new")
-        , Url.map Login (s "login")
         , Url.map Dashboard (s "dashboard")
         ]
 
@@ -41,8 +45,14 @@ route =
 makePath : Route -> String
 makePath route =
     case route of
+        Landing ->
+            ""
+
         Login ->
             "#/login"
+
+        Signup ->
+            "#/signup"
 
         Story storyid ->
             "#/story/" ++ toString storyid

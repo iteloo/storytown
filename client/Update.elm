@@ -172,6 +172,13 @@ updatePage :
     -> ( PageModel, Cmd Msg )
 updatePage { toMsg } msg s =
     case ( msg, s ) of
+        ( DashboardMsg msg, Dashboard s ) ->
+            mapModel Dashboard <|
+                updateDashboard
+                    { toMsg = toMsg << DashboardMsg }
+                    msg
+                    s
+
         ( LoginMsg msg, LoginPage s ) ->
             mapModel LoginPage <|
                 updateLogin
@@ -179,10 +186,10 @@ updatePage { toMsg } msg s =
                     msg
                     s
 
-        ( DashboardMsg msg, Dashboard s ) ->
-            mapModel Dashboard <|
-                updateDashboard
-                    { toMsg = toMsg << DashboardMsg }
+        ( SignupMsg msg, SignupPage s ) ->
+            mapModel SignupPage <|
+                updateSignup
+                    { toMsg = toMsg << SignupMsg }
                     msg
                     s
 
@@ -232,6 +239,50 @@ updateLogin { toMsg } msg s =
             { s | user = Just (apiUserToUser authUnsafe.user) }
                 ! []
                 :> gotoRoute (Maybe.withDefault Routing.Dashboard s.redirect)
+
+
+updateSignup :
+    { toMsg : SignupMsg -> Msg }
+    -> SignupMsg
+    -> SignupModel
+    -> ( SignupModel, Cmd Msg )
+updateSignup { toMsg } msg s =
+    case msg of
+        EmailInputChange t ->
+            { s | emailInput = t } ! []
+
+        FirstnameInputChange t ->
+            { s | firstnameInput = t } ! []
+
+        LastnameInputChange t ->
+            { s | lastnameInput = t } ! []
+
+        SPasswordInputChange t ->
+            { s | passwordInput = t } ! []
+
+        ConfirmInputChange t ->
+            { s | confirmInput = t } ! []
+
+        SignupButton ->
+            s
+                ! [ Server.send
+                        (toMsg << SignupResult)
+                        (Api.postSignup
+                            { -- [tmp] bogus
+                              signupEmail = s.emailInput
+                            , signupPassword = s.passwordInput
+                            , signupFirstName = s.firstnameInput
+                            , signupLastName = s.lastnameInput
+                            }
+                        )
+                  ]
+
+        SignupResult (Just userid) ->
+            -- [tmp] display alert properly
+            s ! []
+
+        SignupResult Nothing ->
+            s ! []
 
 
 updateDashboard :
@@ -896,6 +947,20 @@ routeChange route app =
     let
         ( newPage, cmd ) =
             case route of
+                Routing.Landing ->
+                    LandingPage (initLanding (user app)) ! []
+
+                Routing.Login ->
+                    defaultLogin app <|
+                        \user -> LoginPage (initLoginWithUser user) ! []
+
+                Routing.Signup ->
+                    SignupPage (initSignup (user app)) ! []
+
+                Routing.Dashboard ->
+                    defaultLogin app <|
+                        \user -> mapModel Dashboard (initDashboard user)
+
                 Routing.Story storyid ->
                     defaultLogin app <|
                         \user ->
@@ -949,14 +1014,6 @@ routeChange route app =
                                             )
                                             (Api.getApiStoryById storyid)
                                       ]
-
-                Routing.Login ->
-                    defaultLogin app <|
-                        \user -> LoginPage (initLoginWithUser user) ! []
-
-                Routing.Dashboard ->
-                    defaultLogin app <|
-                        \user -> mapModel Dashboard (initDashboard user)
     in
         case app of
             NotReady _ ->
@@ -989,7 +1046,13 @@ user app =
 
         Ready app ->
             case app.page of
+                LandingPage page ->
+                    page.user
+
                 LoginPage page ->
+                    page.user
+
+                SignupPage page ->
                     page.user
 
                 Dashboard page ->

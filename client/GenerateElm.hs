@@ -36,6 +36,7 @@ spec opt =
             (defElmImports
              :  toElmTypeSource    (Proxy :: Proxy NoContent)
              :  toElmSource        (Proxy :: Proxy Login)
+             ++ toElmSource        (Proxy :: Proxy Signup)
              ++ toElmSource        (Proxy :: Proxy User)
              ++ toElmSource        (Proxy :: Proxy AuthData)
              ++ toElmSource        (Proxy :: Proxy Story)
