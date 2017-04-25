@@ -15,6 +15,7 @@ import Translation.MaybeTraverse as TransMaybe
 import Parser
 import Overflow
 import Helper
+import Helper.StoryEdit as Helper
 import Either exposing (Either(..))
 import Dict
 import Task
@@ -25,6 +26,7 @@ import Update.Extra exposing (addCmd)
 import Update.Extra.Infix exposing ((:>))
 import RemoteData as RD
 import Bootstrap.Navbar as Navbar
+import Bootstrap.Dropdown as Dropdown
 import AnimationFrame
 
 
@@ -73,45 +75,50 @@ initDashboard user =
 
 subs : { a | app : AppModel } -> Sub Msg
 subs s =
+    case s.app of
+        Ready rm ->
+            Sub.map (ReadyMsg << PageMsg) <|
+                case rm.page of
+                    StoryPage s ->
+                        Sub.map StoryMsg (storySub s)
+
+                    StoryEditPage s ->
+                        Sub.map StoryEditMsg (storyEditSub s)
+
+                    _ ->
+                        Sub.none
+
+        _ ->
+            Sub.none
+
+
+storySub : StoryModel -> Sub StoryMsg
+storySub s =
     Sub.batch <|
-        List.concat
-            [ [ Audio.onStateChange
-                    (ReadyMsg << PageMsg << StoryMsg << PlaybackStateChanged)
-              ]
-            , case s.app of
-                Ready rm ->
-                    case rm.page of
-                        StoryPage s ->
-                            case s.story of
-                                RD.Success sty ->
-                                    case sty.sentences of
-                                        Trans.Measuring _ ->
-                                            [ AnimationFrame.times
-                                                (ReadyMsg
-                                                    << PageMsg
-                                                    << StoryMsg
-                                                    << AnimationFrame
-                                                )
-                                            , Overflow.measured
-                                                (ReadyMsg
-                                                    << PageMsg
-                                                    << StoryMsg
-                                                    << uncurry LineWrapMeasured
-                                                )
-                                            ]
+        [ Audio.onStateChange PlaybackStateChanged
+        , case s.story of
+            RD.Success sty ->
+                case sty.sentences of
+                    Trans.Measuring _ ->
+                        Sub.batch
+                            [ AnimationFrame.times AnimationFrame
+                            , Overflow.measured (uncurry LineWrapMeasured)
+                            ]
 
-                                        _ ->
-                                            []
+                    _ ->
+                        Sub.none
 
-                                _ ->
-                                    []
+            _ ->
+                Sub.none
+        ]
 
-                        _ ->
-                            []
 
-                _ ->
-                    []
-            ]
+storyEditSub : StoryEditModel -> Sub StoryEditMsg
+storyEditSub s =
+    Sub.batch
+        [ Dropdown.subscriptions s.sourceDdState SourceDdMsg
+        , Dropdown.subscriptions s.targetDdState TargetDdMsg
+        ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -732,30 +739,32 @@ updateStoryEdit { toMsg } message s =
                 s
 
         ApplyButton storyId ->
-            case s.story of
-                RD.Success draft ->
+            case
+                s.story |> RD.toMaybe |> Maybe.andThen Helper.storyFromDraft
+            of
+                Just story ->
                     s
                         ! [ Server.send
                                 (toMsg << always StoryCreatedOrUpdated)
-                                (Api.putApiStoryById storyId
-                                    (storyFromDraft draft)
-                                )
+                                (Api.putApiStoryById storyId story)
                           ]
 
-                _ ->
-                    Debug.crash "Button should be disabled!"
+                Nothing ->
+                    Debug.crash "Button shouldn't be enabled"
 
         CreateButton ->
-            case s.story of
-                RD.Success story ->
+            case
+                s.story |> RD.toMaybe |> Maybe.andThen Helper.storyFromDraft
+            of
+                Just story ->
                     s
                         ! [ Server.send
                                 (toMsg << always StoryCreatedOrUpdated)
-                                (Api.postApiStory (storyFromDraft story))
+                                (Api.postApiStory story)
                           ]
 
-                _ ->
-                    Debug.crash "Button should be disabled!"
+                Nothing ->
+                    Debug.crash "Button shouldn't be enabled"
 
         DiscardButton ->
             gotoRoute Routing.Dashboard s
@@ -782,6 +791,48 @@ updateStoryEdit { toMsg } message s =
                 )
                 s
 
+        SourceDdMsg state ->
+            { s | sourceDdState = state } ! []
+
+        TargetDdMsg state ->
+            { s | targetDdState = state } ! []
+
+        SourceSelected lang ->
+            updateStory
+                (\sty ->
+                    { sty
+                        | source = Just lang
+                        , target =
+                            sty.target
+                                |> Maybe.andThen
+                                    (\l ->
+                                        if l == lang then
+                                            Nothing
+                                        else
+                                            Just l
+                                    )
+                    }
+                )
+                s
+
+        TargetSelected lang ->
+            updateStory
+                (\sty ->
+                    { sty
+                        | target = Just lang
+                        , source =
+                            sty.source
+                                |> Maybe.andThen
+                                    (\l ->
+                                        if l == lang then
+                                            Nothing
+                                        else
+                                            Just l
+                                    )
+                    }
+                )
+                s
+
         -- SERVER
         StoryToEditReceived story ->
             { s
@@ -799,6 +850,24 @@ updateStoryEdit { toMsg } message s =
                                                 }
                                             )
                                             sty.sentences
+                            , source =
+                                case decodeLanguage sty.sourceLanguage of
+                                    Nothing ->
+                                        Debug.crash <|
+                                            "invalid source language: "
+                                                ++ sty.sourceLanguage
+
+                                    x ->
+                                        x
+                            , target =
+                                case decodeLanguage sty.targetLanguage of
+                                    Nothing ->
+                                        Debug.crash <|
+                                            "invalid target language: "
+                                                ++ sty.targetLanguage
+
+                                    x ->
+                                        x
                             , freshIndex = List.length sty.sentences
                             }
                         )
@@ -904,22 +973,6 @@ updateStoryEdit { toMsg } message s =
 
 
 -- STORY EDIT
-
-
-storyFromDraft : StoryDraft -> Api.Story
-storyFromDraft draft =
-    { title = draft.title
-    , sentences =
-        List.map
-            (\{ text, audioUrl } ->
-                { text = text, audioUrl = audioUrl }
-            )
-        <|
-            Dict.values draft.sentences
-    }
-
-
-
 -- ROUTING
 
 
@@ -1001,6 +1054,8 @@ routeChange route app =
                                         | story =
                                             RD.succeed
                                                 { title = "Untitled"
+                                                , source = Nothing
+                                                , target = Nothing
                                                 , freshIndex = 0
                                                 , sentences = Dict.empty
                                                 }

@@ -9,6 +9,7 @@ import Translation.Layout as Trans exposing (Measured)
 import Translation.Path as Trans
 import Time
 import Bootstrap.Navbar as Navbar
+import Bootstrap.Dropdown as Dropdown
 
 
 type Msg
@@ -93,6 +94,10 @@ type StoryEditMsg
     | DeleteStoryButton
     | DeleteItemButton ItemId
     | ItemSourceChange Int String
+    | SourceDdMsg Dropdown.State
+    | TargetDdMsg Dropdown.State
+    | SourceSelected Language
+    | TargetSelected Language
       -- SERVER
     | StoryToEditReceived (Web Api.Story)
     | StoryCreatedOrUpdated

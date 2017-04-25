@@ -37,6 +37,8 @@ DUser
     deriving Show
 DStory
     title Text
+    sourceLanguage String
+    targetLanguage String
     deriving Show
 DItem
     storyId DStoryId
@@ -72,8 +74,10 @@ instance FromJWT User
 instance ElmType User
 
 data Story = Story {
-    title     :: Text
-  , sentences :: [Item]
+    title          :: Text
+  , sourceLanguage :: String
+  , targetLanguage :: String
+  , sentences      :: [Item]
 } deriving (Eq, Show, Generic)
 
 instance ToJSON Story

@@ -7,6 +7,7 @@ import RemoteData as RD
 import Time
 import Navigation as Nav
 import Bootstrap.Navbar as Navbar
+import Bootstrap.Dropdown as Dropdown
 import Translation.Layout as Trans
 
 
@@ -128,6 +129,8 @@ initStory user =
 type alias StoryEditModel =
     { story : Web StoryDraft
     , recordingId : Maybe ItemId
+    , sourceDdState : Dropdown.State
+    , targetDdState : Dropdown.State
     , user : User
     , mode : StoryEditMode
     }
@@ -135,9 +138,39 @@ type alias StoryEditModel =
 
 type alias StoryDraft =
     { title : String
+    , source : Maybe Language
+    , target : Maybe Language
     , sentences : Dict.Dict Int ItemEdit
     , freshIndex : Int
     }
+
+
+type Language
+    = English
+    | Mandarin
+
+
+encodeLanguage : Language -> String
+encodeLanguage =
+    toString
+
+
+decodeLanguage : String -> Maybe Language
+decodeLanguage str =
+    case str of
+        "English" ->
+            Just English
+
+        "Mandarin" ->
+            Just Mandarin
+
+        _ ->
+            Nothing
+
+
+allLangs : List Language
+allLangs =
+    [ English, Mandarin ]
 
 
 type StoryEditMode
@@ -155,6 +188,8 @@ initStoryEdit : User -> StoryEditMode -> StoryEditModel
 initStoryEdit user mode =
     { story = RD.NotAsked
     , recordingId = Nothing
+    , sourceDdState = Dropdown.initialState
+    , targetDdState = Dropdown.initialState
     , user = user
     , mode = mode
     }

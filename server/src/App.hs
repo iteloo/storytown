@@ -198,9 +198,7 @@ getStories = do
 
 postStory :: Story -> MyHandler StoryId
 postStory story = runDb $ do
-    storyId <- DB.fromSqlKey <$> DB.insert DStory {
-        dStoryTitle = title story
-      }
+    storyId <- DB.fromSqlKey <$> DB.insert (storyToDStory story)
     insertSentencesForStory storyId story
     return storyId
 
@@ -215,6 +213,8 @@ getStory newId = runDb $ do
           sentences <- DB.selectList [DItemStoryId ==. storyId] []
           return Story {
               title = dStoryTitle story
+            , sourceLanguage = dStorySourceLanguage story
+            , targetLanguage = dStoryTargetLanguage story
             , sentences = [ Item {
                 text = dItemText (DB.entityVal s)
               , audioUrl = dItemAudioUrl (DB.entityVal s)
@@ -223,9 +223,7 @@ getStory newId = runDb $ do
 
 putStory :: StoryId -> Story -> MyHandler NoContent
 putStory storyId story = runDb $ do
-    DB.repsert (DB.toSqlKey storyId) DStory {
-        dStoryTitle = title story
-      }
+    DB.repsert (DB.toSqlKey storyId) (storyToDStory story)
     -- remove sentences under this storyid
     deleteAllSentences storyId
     -- insert new sentences
@@ -250,3 +248,9 @@ insertSentencesForStory storyId story =
 
 deleteAllSentences storyid =
     DB.deleteWhere [DItemStoryId ==. DB.toSqlKey storyid]
+
+storyToDStory story = DStory {
+        dStoryTitle = title story
+      , dStorySourceLanguage = sourceLanguage story
+      , dStoryTargetLanguage = targetLanguage story
+      }

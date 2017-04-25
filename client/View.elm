@@ -7,6 +7,7 @@ import Routing
 import TransView
 import Parser
 import Helper
+import Helper.StoryEdit as Helper
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -22,6 +23,7 @@ import Bootstrap.Button as Button
 import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Alert as Alert
+import Bootstrap.Dropdown as Dropdown
 import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 import Html.CssHelpers
 
@@ -347,31 +349,68 @@ storyEditView s =
                 text "Cannot load..."
 
             RD.Success story ->
-                div [ class [ Table ] ] <|
-                    Dict.values <|
-                        Dict.map
-                            (\index item -> itemEditView s index item)
-                            story.sentences
+                div []
+                    [ text "Translate from"
+                    , Dropdown.dropdown
+                        s.sourceDdState
+                        { options = [ Dropdown.alignMenuRight ]
+                        , toggleMsg = SourceDdMsg
+                        , toggleButton =
+                            Dropdown.toggle [ Button.secondary ]
+                                [ text
+                                    (story.source
+                                        |> Maybe.map toString
+                                        |> Maybe.withDefault "..."
+                                    )
+                                ]
+                        , items =
+                            List.map
+                                (\lang ->
+                                    Dropdown.buttonItem
+                                        [ onClick (SourceSelected lang) ]
+                                        [ text (toString lang) ]
+                                )
+                                allLangs
+                        }
+                    , text "to"
+                    , Dropdown.dropdown
+                        s.targetDdState
+                        { options = [ Dropdown.alignMenuRight ]
+                        , toggleMsg = TargetDdMsg
+                        , toggleButton =
+                            Dropdown.toggle [ Button.secondary ]
+                                [ text
+                                    (story.target
+                                        |> Maybe.map toString
+                                        |> Maybe.withDefault "..."
+                                    )
+                                ]
+                        , items =
+                            List.map
+                                (\lang ->
+                                    Dropdown.buttonItem
+                                        [ onClick (TargetSelected lang) ]
+                                        [ text (toString lang) ]
+                                )
+                                allLangs
+                        }
+                    , div [ class [ Table ] ] <|
+                        Dict.values <|
+                            Dict.map
+                                (\index item -> itemEditView s index item)
+                                story.sentences
+                    ]
         , button [ onClick (AddBelowButton 0) ] [ text "+" ]
         , let
             submitButton s text_ onClick_ =
                 Button.button
                     [ Button.success
-                    , Button.disabled <|
-                        case s.story of
-                            RD.Success story ->
-                                (story.sentences
-                                    |> Dict.values
-                                    |> List.any
-                                        (.text
-                                            >> Parser.parseTranslatedText
-                                            >> Helper.isErr
-                                        )
-                                )
-                                    || Dict.isEmpty story.sentences
-
-                            _ ->
-                                True
+                    , Button.disabled
+                        (s.story
+                            |> RD.toMaybe
+                            |> Maybe.andThen Helper.storyFromDraft
+                            |> Helper.isNothing
+                        )
                     , Button.attrs <|
                         if RD.isSuccess s.story then
                             [ onClick onClick_ ]
