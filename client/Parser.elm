@@ -70,7 +70,11 @@ indentation p =
                             if n == i then
                                 succeed ()
                             else
-                                fail ("expected " ++ toString i ++ " spaces of indentation")
+                                fail
+                                    ("expected "
+                                        ++ toString i
+                                        ++ " spaces of indentation"
+                                    )
         )
         *> p
 
@@ -145,12 +149,12 @@ notEol =
 line : Parser s String
 line =
     -- [todo] can be made more efficient
-    map String.fromList (manyTill anyChar eol <|> manyTill anyChar end)
+    String.fromList <$> (manyTill anyChar eol <|> manyTill anyChar end)
 
 
 translatedText : Parser ParseState TranslatedBlock
 translatedText =
-    map translatedBlockFromExpr expr <* end
+    translatedBlockFromExpr <$> expr <* end
 
 
 

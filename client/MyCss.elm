@@ -30,6 +30,7 @@ type CssClass
     | Min
     | Expand
     | Collapse
+    | ColouredSpace
 
 
 css : Stylesheet
@@ -47,6 +48,9 @@ css =
 
             blueGreen =
                 rgba 0 127 127
+
+            orange =
+                rgba 255 165 0
 
             expandCollapse =
                 [ position absolute
@@ -165,4 +169,7 @@ css =
                     , expandCollapse
                     ]
             , class Collapse expandCollapse
+            , class ColouredSpace
+                [ backgroundColor (orange 0.2)
+                ]
             ]

@@ -469,7 +469,12 @@ transView : Parser.TranslatedBlock -> Html StoryEditMsg
 transView tb =
     case tb of
         Parser.L2Word w ->
-            span [ class [ Cell, Orig ] ] [ text (w ++ " ") ]
+            span [ class [ Cell, Orig ] ]
+                (String.split " " w
+                    |> List.map text
+                    |> List.intersperse
+                        (span [ class [ ColouredSpace ] ] [ text " " ])
+                )
 
         Parser.TranslatedBlock bs tr ->
             div [ class [ Cell ] ]
