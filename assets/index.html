@@ -18,6 +18,15 @@
     <script>
       var app = Elm.Main.fullscreen();
 
+      /* CACHE */
+      app.ports.getRaw.subscribe(key => {
+        app.ports.cacheRaw.send(JSON.parse(localStorage.getItem(key)));
+      })
+
+      app.ports.setRaw.subscribe(info => {
+        localStorage.setItem(info[0], JSON.stringify(info[1]));
+      })
+
       /* OVERFLOW */
       app.ports.measureRaw.subscribe(info => {
 

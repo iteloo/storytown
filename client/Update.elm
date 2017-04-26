@@ -2,6 +2,7 @@ module Update exposing (init, subs, update)
 
 import Model exposing (..)
 import Message exposing (..)
+import Cache
 import Routing
 import Server
 import S3
@@ -16,6 +17,7 @@ import Parser
 import Overflow
 import Helper
 import Helper.StoryEdit as Helper
+import Helper.Auth as Helper
 import Either exposing (Either(..))
 import Dict
 import Task
@@ -39,11 +41,7 @@ init loc =
             , user = Nothing
             }
     }
-        ! [ Server.sendOnAuthError
-                (NotReadyMsg (UserReceived Nothing))
-                (NotReadyMsg << UserReceived << Just)
-                Api.getApiUser
-          ]
+        ! [ Cache.get Cache.loggedIn ]
 
 
 initReady : PageModel -> ( ReadyModel, Cmd Msg )
@@ -88,8 +86,8 @@ subs s =
                     _ ->
                         Sub.none
 
-        _ ->
-            Sub.none
+        NotReady nr ->
+            Sub.map NotReadyMsg (Cache.cache Cache.loggedIn LoggedInStatus)
 
 
 storySub : StoryModel -> Sub StoryMsg
@@ -139,8 +137,8 @@ update message s =
         NotReadyMsg msg ->
             case s.app of
                 NotReady nr ->
-                    case msg of
-                        UserReceived muser ->
+                    let
+                        initAppWithUser muser =
                             { s
                                 | app =
                                     NotReady
@@ -152,6 +150,21 @@ update message s =
                             }
                                 ! []
                                 :> urlChange nr.startingLocation
+                    in
+                        case msg of
+                            LoggedInStatus mloggedIn ->
+                                if Maybe.withDefault False mloggedIn then
+                                    s
+                                        ! [ Server.sendOnAuthError
+                                                (NotReadyMsg (UserReceived Nothing))
+                                                (NotReadyMsg << UserReceived << Just)
+                                                Api.getApiUser
+                                          ]
+                                else
+                                    initAppWithUser Nothing
+
+                            UserReceived muser ->
+                                initAppWithUser muser
 
                 Ready _ ->
                     badMsgState message s
@@ -1012,14 +1025,14 @@ routeChange route app =
         ( newPage, cmd ) =
             case route of
                 Routing.Landing ->
-                    LandingPage (initLanding (user app)) ! []
+                    LandingPage (initLanding (Helper.user app)) ! []
 
                 Routing.Login ->
                     defaultLogin app <|
                         \user -> LoginPage (initLoginWithUser user) ! []
 
                 Routing.Signup ->
-                    SignupPage (initSignup (user app)) ! []
+                    SignupPage (initSignup (Helper.user app)) ! []
 
                 Routing.Dashboard ->
                     defaultLogin app <|
@@ -1080,6 +1093,10 @@ routeChange route app =
                                             )
                                             (Api.getApiStoryById storyid)
                                       ]
+
+                Routing.Loggedout ->
+                    -- [tmp] doesn't actually clear cookie
+                    LoggedoutPage ! [ Cache.set Cache.loggedIn False ]
     in
         case app of
             NotReady _ ->
@@ -1096,39 +1113,12 @@ defaultLogin :
     -> (User -> ( PageModel, Cmd Msg ))
     -> ( PageModel, Cmd Msg )
 defaultLogin app newPageWithAuth =
-    case user app of
+    case Helper.user app of
         Nothing ->
             LoginPage initLogin ! []
 
         Just user ->
             newPageWithAuth user
-
-
-user : AppModel -> Maybe User
-user app =
-    case app of
-        NotReady nr ->
-            nr.user
-
-        Ready app ->
-            case app.page of
-                LandingPage page ->
-                    page.user
-
-                LoginPage page ->
-                    page.user
-
-                SignupPage page ->
-                    page.user
-
-                Dashboard page ->
-                    Just page.user
-
-                StoryPage page ->
-                    Just page.user
-
-                StoryEditPage page ->
-                    Just page.user
 
 
 

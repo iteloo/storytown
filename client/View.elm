@@ -8,6 +8,7 @@ import TransView
 import Parser
 import Helper
 import Helper.StoryEdit as Helper
+import Helper.Auth as Helper
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -54,7 +55,7 @@ view s =
 appView : ReadyModel -> Html ReadyMsg
 appView s =
     div []
-        [ menu s.navState
+        [ menu s.navState (Helper.user (Ready s))
         , Html.map PageMsg <|
             case s.page of
                 LandingPage s ->
@@ -74,22 +75,59 @@ appView s =
 
                 StoryEditPage s ->
                     Html.map StoryEditMsg (storyEditView s)
+
+                LoggedoutPage ->
+                    loggedoutView
           -- , footer [ class [ Footer ] ]
           --     [ div [ Html.Attributes.class "container" ] [ text (toString s) ] ]
         ]
 
 
-menu : Navbar.State -> Html ReadyMsg
-menu s =
+menu : Navbar.State -> Maybe User -> Html ReadyMsg
+menu s muser =
     Navbar.config NavbarMsg
         |> Navbar.withAnimation
         |> Navbar.container
         |> Navbar.brand [ href "#" ] [ text "Storytown" ]
         |> Navbar.items
-            [ Navbar.itemLink
-                [ href (Routing.makePath (Routing.Dashboard)) ]
-                [ text "Dashboard" ]
-            ]
+            (List.concat
+                [ [ Navbar.itemLink
+                        [ href (Routing.makePath Routing.Dashboard) ]
+                        [ text "Dashboard" ]
+                  ]
+                , case muser of
+                    Just user ->
+                        [ Navbar.dropdown
+                            { id = "user-dropdown"
+                            , toggle =
+                                Navbar.dropdownToggle []
+                                    [ text user.firstName ]
+                            , items =
+                                [ Navbar.dropdownHeader [ text "Profile" ]
+                                , Navbar.dropdownItem []
+                                    [ text
+                                        (user.firstName ++ " " ++ user.lastName)
+                                    ]
+                                , Navbar.dropdownItem []
+                                    [ text user.email ]
+                                , Navbar.dropdownDivider
+                                , Navbar.dropdownItem
+                                    [ href (Routing.makePath Routing.Loggedout) ]
+                                    [ text "Log out" ]
+                                ]
+                            }
+                        ]
+
+                    Nothing ->
+                        [ Navbar.itemLink
+                            [ href (Routing.makePath Routing.Login) ]
+                            [ text "Login" ]
+                        , Navbar.itemLink
+                            [ href (Routing.makePath Routing.Signup) ]
+                            [ text "Sign up" ]
+                        ]
+                ]
+            )
         |> Navbar.view s
 
 
@@ -576,3 +614,12 @@ playbackView { playbackState } =
                 ]
                 [ text ">>" ]
             ]
+
+
+
+-- LOGGED OUT
+
+
+loggedoutView : Html msg
+loggedoutView =
+    Grid.container [] [ text "You are successfully logged out!" ]

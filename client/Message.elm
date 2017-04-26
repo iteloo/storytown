@@ -24,7 +24,8 @@ type Msg
 
 
 type NotReadyMsg
-    = UserReceived (Maybe Api.User)
+    = LoggedInStatus (Maybe Bool)
+    | UserReceived (Maybe Api.User)
 
 
 type ReadyMsg

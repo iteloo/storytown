@@ -22,6 +22,7 @@ type Route
     | StoryEdit StoryId
     | StoryNew
     | Dashboard
+    | Loggedout
 
 
 parsePath : Navigation.Location -> Maybe Route
@@ -39,6 +40,7 @@ route =
         , Url.map StoryEdit (s "story" </> s "edit" </> int)
         , Url.map StoryNew (s "story" </> s "new")
         , Url.map Dashboard (s "dashboard")
+        , Url.map Loggedout (s "loggedout")
         ]
 
 
@@ -65,3 +67,6 @@ makePath route =
 
         Dashboard ->
             "#/dashboard"
+
+        Loggedout ->
+            "#/loggedout"

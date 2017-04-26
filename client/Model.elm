@@ -43,6 +43,7 @@ type PageModel
     | Dashboard DashboardModel
     | StoryPage StoryModel
     | StoryEditPage StoryEditModel
+    | LoggedoutPage
 
 
 type alias LandingModel =
