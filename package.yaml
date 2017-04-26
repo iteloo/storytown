@@ -2,37 +2,36 @@ name: storytown
 
 dependencies:
   - base
-  - warp
   - aeson
+  - wai
+  - wai-cors
   - wai-make-assets
+  - wai-extra
+  - warp
+  - warp-tls
   - servant-elm
   - servant
-  - wai
   - servant-server
-  - transformers
-  - containers
+  - servant-auth
+  - servant-auth-server
   - optparse-applicative
   - persistent-postgresql
   - persistent
   - persistent-template
   - heroku-persistent
-  - monad-logger
-  - wai-extra
-  - bytestring
-  - servant-auth
-  - servant-auth-server
-  - bytestring
-  - wai-cors
-  - http-types
   - amazonka
   - amazonka-s3
+  - transformers
+  - containers
+  - bytestring
+  - base64-bytestring
+  - monad-logger
+  - http-types
   - lens
   - time
   - resourcet
   - text
-  - warp-tls
   - entropy
-  - base64-bytestring
   - cookie
 
 executables:
