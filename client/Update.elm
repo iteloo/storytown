@@ -967,9 +967,7 @@ updateStoryEdit { toMsg } message s =
                     case Dict.get itemid ss of
                         Nothing ->
                             Debug.crash
-                                ("missing item with id: "
-                                    ++ toString itemid
-                                )
+                                ("missing item with id: " ++ toString itemid)
 
                         Just item ->
                             Dict.insert itemid
@@ -985,7 +983,6 @@ updateStoryEdit { toMsg } message s =
 
 
 
--- STORY EDIT
 -- ROUTING
 
 
@@ -1000,8 +997,7 @@ urlChange loc s =
         go =
             case Routing.parsePath loc of
                 Nothing ->
-                    -- error "Cannot parse path" s
-                    Debug.crash "Cannot parse path"
+                    gotoRoute Routing.NotFound s
 
                 Just route ->
                     routeChange route s.app
@@ -1097,6 +1093,9 @@ routeChange route app =
                 Routing.Loggedout ->
                     -- [tmp] doesn't actually clear cookie
                     LoggedoutPage ! [ Cache.set Cache.loggedIn False ]
+
+                Routing.NotFound ->
+                    NotFoundPage (initNotFound (Helper.user app)) ! []
     in
         case app of
             NotReady _ ->

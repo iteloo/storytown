@@ -31,3 +31,6 @@ user app =
 
                 LoggedoutPage ->
                     Nothing
+
+                NotFoundPage page ->
+                    page.user

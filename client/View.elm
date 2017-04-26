@@ -78,6 +78,9 @@ appView s =
 
                 LoggedoutPage ->
                     loggedoutView
+
+                NotFoundPage _ ->
+                    notFoundView
           -- , footer [ class [ Footer ] ]
           --     [ div [ Html.Attributes.class "container" ] [ text (toString s) ] ]
         ]
@@ -623,3 +626,12 @@ playbackView { playbackState } =
 loggedoutView : Html msg
 loggedoutView =
     Grid.container [] [ text "You are successfully logged out!" ]
+
+
+
+-- NOT FOUND
+
+
+notFoundView : Html msg
+notFoundView =
+    Grid.container [] [ text "Page not found :(" ]

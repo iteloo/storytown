@@ -23,6 +23,7 @@ type Route
     | StoryNew
     | Dashboard
     | Loggedout
+    | NotFound
 
 
 parsePath : Navigation.Location -> Maybe Route
@@ -41,6 +42,7 @@ route =
         , Url.map StoryNew (s "story" </> s "new")
         , Url.map Dashboard (s "dashboard")
         , Url.map Loggedout (s "loggedout")
+        , Url.map NotFound (s "not_found")
         ]
 
 
@@ -48,7 +50,7 @@ makePath : Route -> String
 makePath route =
     case route of
         Landing ->
-            ""
+            "#"
 
         Login ->
             "#/login"
@@ -70,3 +72,6 @@ makePath route =
 
         Loggedout ->
             "#/loggedout"
+
+        NotFound ->
+            "#/not_found"

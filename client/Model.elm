@@ -44,6 +44,7 @@ type PageModel
     | StoryPage StoryModel
     | StoryEditPage StoryEditModel
     | LoggedoutPage
+    | NotFoundPage NotFoundModel
 
 
 type alias LandingModel =
@@ -194,6 +195,15 @@ initStoryEdit user mode =
     , user = user
     , mode = mode
     }
+
+
+type alias NotFoundModel =
+    { user : Maybe User }
+
+
+initNotFound : Maybe User -> NotFoundModel
+initNotFound user =
+    { user = user }
 
 
 type alias StoryId =
