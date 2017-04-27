@@ -137,6 +137,10 @@ css =
             , class Trans
                 [ color (green 0.7)
                 , fontSize transFontSize
+                , empty
+                    [ before
+                        [ property "content" "\"\\200b\"" ]
+                    ]
                 ]
             , class Hoverarea <|
                 let
