@@ -5,6 +5,7 @@ import Message exposing (..)
 import MyCss exposing (CssClass(..))
 import Routing
 import TransView
+import Language exposing (Language(..))
 import Parser
 import Helper
 import Helper.StoryEdit as Helper
@@ -411,7 +412,7 @@ storyEditView s =
                                         [ onClick (SourceSelected lang) ]
                                         [ text (toString lang) ]
                                 )
-                                allLangs
+                                Language.allLangs
                         }
                     , text "to"
                     , Dropdown.dropdown
@@ -433,7 +434,7 @@ storyEditView s =
                                         [ onClick (TargetSelected lang) ]
                                         [ text (toString lang) ]
                                 )
-                                allLangs
+                                Language.allLangs
                         }
                     , div [ class [ Table ] ] <|
                         Dict.values <|
@@ -533,7 +534,9 @@ itemEditView { recordingId } index item =
                     ]
                     [ text item.text ]
                 , div [ class [ Table ] ]
-                    [ case Parser.parseTranslatedText item.text of
+                    [ -- [tmp] [hack] we don't need to split translations in
+                      --       edit mode, so give bogus language for now
+                      case Parser.parseTranslatedText Mandarin item.text of
                         Ok r ->
                             transView r
 

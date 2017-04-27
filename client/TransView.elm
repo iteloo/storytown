@@ -129,7 +129,10 @@ measureDiv m =
                     SentenceMeasurementDiv
             ]
         ]
-        << List.map (span [] << List.singleton << text)
+        << -- [hack] this is essential to actually allow wrapping
+           List.intersperse (text " ")
+        << List.map
+            (span [ class [ MeasurementSpan ] ] << List.singleton << text)
 
 
 splitParagraph :

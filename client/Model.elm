@@ -2,6 +2,7 @@ module Model exposing (..)
 
 import Routing
 import Api
+import Language exposing (Language)
 import Dict
 import RemoteData as RD
 import Time
@@ -117,6 +118,8 @@ type alias StoryModel =
 type alias StoryState =
     { title : String
     , sentences : Trans.ParagraphLayout
+    , source : Language
+    , target : Language
     }
 
 
@@ -145,34 +148,6 @@ type alias StoryDraft =
     , sentences : Dict.Dict Int ItemEdit
     , freshIndex : Int
     }
-
-
-type Language
-    = English
-    | Mandarin
-
-
-encodeLanguage : Language -> String
-encodeLanguage =
-    toString
-
-
-decodeLanguage : String -> Maybe Language
-decodeLanguage str =
-    case str of
-        "English" ->
-            Just English
-
-        "Mandarin" ->
-            Just Mandarin
-
-        _ ->
-            Nothing
-
-
-allLangs : List Language
-allLangs =
-    [ English, Mandarin ]
 
 
 type StoryEditMode

@@ -22,6 +22,7 @@ type CssClass
     | FakeCell
     | MeasurementDiv
     | SentenceMeasurementDiv
+    | MeasurementSpan
     | SidePadding
     | Padding
     | Trans
@@ -120,6 +121,8 @@ css =
                 , whiteSpace noWrap
                 , textAlign left
                 ]
+            , class MeasurementSpan
+                [ whiteSpace noWrap ]
             , class SidePadding
                 [ paddingLeft (pt 2)
                 , paddingRight (pt 2)

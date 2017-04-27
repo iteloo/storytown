@@ -2,6 +2,7 @@ module Message exposing (..)
 
 import Model exposing (..)
 import Api
+import Language exposing (Language)
 import MediaRecorder as MR
 import Navigation as Nav
 import Translation.Base as Trans exposing (Collapsable, Word)

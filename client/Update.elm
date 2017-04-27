@@ -2,6 +2,7 @@ module Update exposing (init, subs, update)
 
 import Model exposing (..)
 import Message exposing (..)
+import Language
 import Cache
 import Routing
 import Server
@@ -264,7 +265,7 @@ updateLogin { toMsg } msg s =
         -- SERVER
         AuthDataReceived authUnsafe ->
             { s | user = Just (apiUserToUser authUnsafe.user) }
-                ! []
+                ! [ Cache.set Cache.loggedIn True ]
                 :> gotoRoute (Maybe.withDefault Routing.Dashboard s.redirect)
 
         LoginFailed ->
@@ -367,8 +368,8 @@ updateStoryPage { toMsg } message s =
         -- SERVER
         StoryReceived story ->
             let
-                itemToSentence { text, audioUrl } =
-                    case Parser.parseTranslatedText text of
+                itemToSentence lang { text, audioUrl } =
+                    case Parser.parseTranslatedText lang text of
                         Ok r ->
                             { collapsable =
                                 Trans.fullyCollapsed r
@@ -389,18 +390,31 @@ updateStoryPage { toMsg } message s =
                     | story =
                         RD.map
                             (\sty ->
-                                { title = sty.title
-                                , sentences =
-                                    Trans.Measuring <|
-                                        ( Left <|
-                                            Dict.fromList <|
-                                                List.indexedMap (,) <|
-                                                    List.map
-                                                        itemToSentence
-                                                        sty.sentences
-                                        , Left ".."
-                                        )
-                                }
+                                case
+                                    Maybe.map2 (,)
+                                        (Language.decodeLanguage sty.sourceLanguage)
+                                        (Language.decodeLanguage sty.targetLanguage)
+                                of
+                                    Just ( source, target ) ->
+                                        { title = sty.title
+                                        , sentences =
+                                            Trans.Measuring <|
+                                                ( Left <|
+                                                    Dict.fromList <|
+                                                        List.indexedMap (,) <|
+                                                            List.map
+                                                                (itemToSentence source)
+                                                                sty.sentences
+                                                , Left ".."
+                                                )
+                                        , source = source
+                                        , target = target
+                                        }
+
+                                    _ ->
+                                        Debug.crash <|
+                                            "invalid source language: "
+                                                ++ sty.sourceLanguage
                             )
                             story
                 }
@@ -864,7 +878,7 @@ updateStoryEdit { toMsg } message s =
                                             )
                                             sty.sentences
                             , source =
-                                case decodeLanguage sty.sourceLanguage of
+                                case Language.decodeLanguage sty.sourceLanguage of
                                     Nothing ->
                                         Debug.crash <|
                                             "invalid source language: "
@@ -873,7 +887,7 @@ updateStoryEdit { toMsg } message s =
                                     x ->
                                         x
                             , target =
-                                case decodeLanguage sty.targetLanguage of
+                                case Language.decodeLanguage sty.targetLanguage of
                                     Nothing ->
                                         Debug.crash <|
                                             "invalid target language: "

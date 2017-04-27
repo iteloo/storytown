@@ -5,9 +5,11 @@ module Parser
         , TranslatedBlock(..)
         )
 
+import Language exposing (Language(..))
+import Regex
 import Combine exposing (..)
 import Combine.Char exposing (..)
-import List.Nonempty as NList exposing (Nonempty, (:::))
+import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 
 
 type alias TranslatedText =
@@ -19,9 +21,9 @@ type TranslatedBlock
     | TranslatedBlock (Nonempty TranslatedBlock) String
 
 
-parseTranslatedText : String -> Result String TranslatedBlock
-parseTranslatedText input =
-    case runParser translatedText (NList.fromElement 0) input of
+parseTranslatedText : Language -> String -> Result String TranslatedBlock
+parseTranslatedText lang input =
+    case runParser (translatedText lang) (Nonempty.fromElement 0) input of
         Ok ( _, _, result ) ->
             Ok result
 
@@ -35,17 +37,40 @@ type Expr
     | BlockTranslation String (Nonempty Expr)
 
 
-translatedBlockFromExpr : Expr -> TranslatedBlock
-translatedBlockFromExpr exp =
+translatedBlockFromExpr : Language -> Expr -> TranslatedBlock
+translatedBlockFromExpr lang exp =
     case exp of
         UntranslatedWord w ->
             L2Word w
 
         WordTranslation w t ->
-            TranslatedBlock (NList.fromElement (L2Word w)) t
+            TranslatedBlock
+                (case lang of
+                    English ->
+                        case
+                            w
+                                |> Regex.find Regex.All (Regex.regex "[^\\s]*\\s*")
+                                |> List.map (.match >> L2Word)
+                                |> Nonempty.fromList
+                        of
+                            Nothing ->
+                                Debug.crash "regex should have at least 1 match"
+
+                            Just ws ->
+                                ws
+
+                    Mandarin ->
+                        w
+                            |> String.toList
+                            |> List.map String.fromChar
+                            |> Nonempty.fromList
+                            |> Maybe.withDefault (Nonempty.fromElement w)
+                            |> Nonempty.map L2Word
+                )
+                t
 
         BlockTranslation t exps ->
-            TranslatedBlock (NList.map translatedBlockFromExpr exps) t
+            TranslatedBlock (Nonempty.map (translatedBlockFromExpr lang) exps) t
 
 
 type alias ParseState =
@@ -65,7 +90,7 @@ indentation p =
                 >>= \n ->
                         let
                             i =
-                                NList.head s
+                                Nonempty.head s
                         in
                             if n == i then
                                 succeed ()
@@ -86,7 +111,7 @@ indent =
             >>= (\n ->
                     withState <|
                         \s ->
-                            if n > NList.head s then
+                            if n > Nonempty.head s then
                                 putState (n ::: s)
                             else
                                 fail "expected indentation"
@@ -100,8 +125,8 @@ unindent =
             >>= \n ->
                     withState <|
                         \s ->
-                            if NList.head s >= n then
-                                putState (NList.pop s)
+                            if Nonempty.head s >= n then
+                                putState (Nonempty.pop s)
                             else
                                 fail "expect unindentation"
 
@@ -118,7 +143,7 @@ block =
                     x
     in
         indent
-            *> (unsafe << NList.fromList <$> many1 (indentation expr))
+            *> (unsafe << Nonempty.fromList <$> many1 (indentation expr))
             <* unindent
 
 
@@ -128,10 +153,16 @@ expr =
         \_ ->
             (BlockTranslation <$> line <*> block)
                 <|> (WordTranslation
-                        <$> map String.fromList (manyTill notEol (char '/'))
+                        <$> map (String.fromList << Nonempty.toList)
+                                (manyTill1 notEol (char '/'))
                         <*> line
                     )
                 <|> (UntranslatedWord <$> line)
+
+
+manyTill1 : Parser s a -> Parser s end -> Parser s (Nonempty a)
+manyTill1 p delim =
+    (delim *> fail "nothing before delim") <|> (Nonempty <$> p <*> manyTill p delim)
 
 
 {-| [unused]
@@ -152,9 +183,9 @@ line =
     String.fromList <$> (manyTill anyChar eol <|> manyTill anyChar end)
 
 
-translatedText : Parser ParseState TranslatedBlock
-translatedText =
-    translatedBlockFromExpr <$> expr <* end
+translatedText : Language -> Parser ParseState TranslatedBlock
+translatedText lang =
+    translatedBlockFromExpr lang <$> expr <* end
 
 
 
