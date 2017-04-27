@@ -1,6 +1,7 @@
 module Translation.Layout
     exposing
         ( Paragraph
+        , RegisteredParagraph
         , ParagraphLayout
         , Layout(..)
         , ParagraphLayoutError(..)
@@ -32,10 +33,15 @@ type alias Paragraph a b =
         }
 
 
+type alias RegisteredParagraph a b =
+    Paragraph ( a, Maybe (CursorZipper a b) ) b
+
+
 type alias ParagraphLayout =
     -- [todo] clean up namespace
     Layout ( Either (Paragraph (Either (List String) (List (Measured String))) Word) (Paragraph (Either (List String) (List (Measured String))) (Measured Word)), Either String (Measured String) )
-        { paragraph : ( Paragraph (List (Measured String)) (Measured Word), Measured String )
+        { paragraph :
+            ( RegisteredParagraph (List (Measured String)) (Measured Word), Measured String )
         , hover : Maybe FullPath
         }
         ParagraphLayoutError

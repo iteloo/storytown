@@ -15,6 +15,7 @@ import Translation.Base as Trans
 import Translation.Layout as Trans
 import Translation.Path as Trans
 import Translation.MaybeTraverse as TransMaybe
+import Translation.Register as Trans
 import Parser
 import Overflow
 import Helper
@@ -512,7 +513,12 @@ updateStoryPage { toMsg } message s =
                                         Tuple.mapFirst
                                             (Dict.update idx
                                                 (Maybe.map
-                                                    (\sen -> { sen | collapsable = new })
+                                                    (\sen ->
+                                                        { sen
+                                                            | collapsable =
+                                                                Trans.registerCursors new
+                                                        }
+                                                    )
                                                 )
                                             )
                                             formatted.paragraph
@@ -526,7 +532,6 @@ updateStoryPage { toMsg } message s =
 
         AnimationFrame _ ->
             let
-                -- [todo] add a Formatting state
                 ( _, cmd ) =
                     RD.update
                         (\story ->
@@ -578,12 +583,13 @@ updateStoryPage { toMsg } message s =
                                 (\story ->
                                     case story.sentences of
                                         Trans.Formatted { paragraph } ->
-                                            Dict.map
-                                                (\idx i ->
-                                                    i.audioUrl
-                                                        |> Maybe.map (flip (,) idx)
-                                                )
-                                                (Tuple.first paragraph)
+                                            paragraph
+                                                |> Tuple.first
+                                                |> Dict.map
+                                                    (\idx i ->
+                                                        i.audioUrl
+                                                            |> Maybe.map (flip (,) idx)
+                                                    )
                                                 |> Dict.values
                                                 |> Helper.sequenceMaybe
 
@@ -613,6 +619,28 @@ updateStoryPage { toMsg } message s =
                         )
                         >> Tuple.mapSecond Either.toMaybe
                         >> uncurry (Maybe.map2 (,))
+
+                checkAndFormat paragraph =
+                    check paragraph
+                        |> Maybe.map
+                            (\p ->
+                                Trans.Formatted
+                                    { paragraph =
+                                        p
+                                            |> Tuple.mapFirst
+                                                (Dict.map
+                                                    (\_ sen ->
+                                                        { sen
+                                                            | collapsable =
+                                                                Trans.registerCursors sen.collapsable
+                                                        }
+                                                    )
+                                                )
+                                    , hover = Nothing
+                                    }
+                            )
+                        |> Maybe.withDefault
+                            (paragraph |> Trans.Measuring)
             in
                 -- [todo] change this to measure the concatenation of items
                 updateSentences
@@ -676,16 +704,7 @@ updateStoryPage { toMsg } message s =
                                                     (both
                                                         >> Maybe.map
                                                             (\para ->
-                                                                check ( Right para, ellipses )
-                                                                    |> Maybe.map
-                                                                        (\p ->
-                                                                            Trans.Formatted
-                                                                                { paragraph = p
-                                                                                , hover = Nothing
-                                                                                }
-                                                                        )
-                                                                    |> Maybe.withDefault
-                                                                        (( Right para, ellipses ) |> Trans.Measuring)
+                                                                checkAndFormat ( Right para, ellipses )
                                                             )
                                                         >> handleError
                                                     )
@@ -697,16 +716,7 @@ updateStoryPage { toMsg } message s =
                                                     |> Trans.markLeaves measurement
                                                     |> Maybe.map
                                                         (\para ->
-                                                            check ( Right para, ellipses )
-                                                                |> Maybe.map
-                                                                    (\p ->
-                                                                        Trans.Formatted
-                                                                            { paragraph = p
-                                                                            , hover = Nothing
-                                                                            }
-                                                                    )
-                                                                |> Maybe.withDefault
-                                                                    (( Right para, ellipses ) |> Trans.Measuring)
+                                                            checkAndFormat ( Right para, ellipses )
                                                         )
                                                     |> Maybe.withDefault
                                                         (Trans.LayoutError Trans.CannotZipWidths)
@@ -731,15 +741,7 @@ updateStoryPage { toMsg } message s =
                                                                     }
                                                                 )
                                                         in
-                                                            check updated
-                                                                |> Maybe.map
-                                                                    (\p ->
-                                                                        Trans.Formatted
-                                                                            { paragraph = p
-                                                                            , hover = Nothing
-                                                                            }
-                                                                    )
-                                                                |> Maybe.withDefault (updated |> Trans.Measuring)
+                                                            checkAndFormat updated
 
                                                     _ ->
                                                         Trans.LayoutError Trans.CannotZipWidths

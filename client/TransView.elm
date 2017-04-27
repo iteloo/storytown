@@ -5,7 +5,6 @@ import Message exposing (..)
 import MyCss exposing (CssClass(..))
 import Translation.Base exposing (..)
 import Translation.Cursor exposing (..)
-import Translation.Block exposing (..)
 import Translation.Layout exposing (..)
 import Translation.Path exposing (..)
 import Gesture
@@ -55,17 +54,7 @@ view { sentences } playbackState curIdx =
                     ]
 
         Formatted formatted ->
-            { formatted
-                | paragraph =
-                    Tuple.mapFirst
-                        (Dict.map
-                            (\_ i ->
-                                { i | collapsable = registerCursors i.collapsable }
-                            )
-                        )
-                        formatted.paragraph
-            }
-                |> splitParagraph curIdx playbackState
+            formatted |> splitParagraph curIdx playbackState
 
         LayoutError e ->
             -- [todo] handle more gracefully
@@ -346,38 +335,6 @@ splitCollapsable ellipses idx marked playbackState hover =
             terminalBlock
             collapsedBlock
             << pathedMap (,)
-
-
-{-| [todo] move this into the main view code to avoid using Maybe
--}
-registerCursors :
-    Collapsable a b
-    -> Collapsable ( a, Maybe (CursorZipper a b) ) b
-registerCursors =
-    let
-        register :
-            CursorZipper ( a, Maybe (CursorZipper a b) ) b
-            -> CursorZipper ( a, Maybe (CursorZipper a b) ) b
-        register z =
-            updateNodeCursorZipper
-                (Tuple.mapSecond
-                    (always (Just (mapCursorZipper Tuple.first identity z)))
-                )
-                z
-    in
-        initCursorZipper
-            >> Either.mapRight
-                (mapCursorZipper (\str -> ( str, Nothing )) identity
-                    >> register
-                    >> Helper.untilNothing
-                        (rightBottom >> Maybe.map register)
-                    >> Helper.untilNothing
-                        (leftBottom >> Maybe.map register)
-                    >> toBlockZipper
-                    >> top
-                    >> (\(BlockZipper block ctx) -> block)
-                )
-            >> Either.fromEither LoneLeaf Block
 
 
 genericBlockView :
