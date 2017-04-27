@@ -361,7 +361,7 @@ genericBlockView idx path isHover ( tr, z ) width childViews =
                         [ div [ class [ SidePadding ] ]
                             [ div
                                 (List.concat
-                                    [ [ Html.Attributes.id
+                                    [ [ Html.Attributes.class
                                             (Gesture.toDivId ( idx, path ))
                                       , class <|
                                             addMin z <|

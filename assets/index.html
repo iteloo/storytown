@@ -23,19 +23,24 @@
       /* GESTURE */
 
       app.ports.setupHammerjsRaw.subscribe(id => {
-        var el = document.getElementById(id);
-        if (el == undefined || el.gestureSetup) { return ;}
+        var $els = $('.'+id);
+        if ($els.length == 0
+            || $els.filter((idx,el) => el.gestureSetup).length == $els.length) {
+          return;
+        }
 
-        var hammertime = new Hammer(el);
-        hammertime.get('swipe').set({ direction: Hammer.DIRECTION_VERTICAL });
-        hammertime.on('swipeup', function(ev) {
-              app.ports.onSwipeRaw.send([id,"Up"])
+        $els.each((idx,el) => {
+          var hammertime = new Hammer(el);
+          hammertime.get('swipe').set({ direction: Hammer.DIRECTION_VERTICAL });
+          hammertime.on('swipeup', function(ev) {
+                app.ports.onSwipeRaw.send([id,"Up"])
+          });
+          hammertime.on('swipedown', function(ev) {
+                app.ports.onSwipeRaw.send([id,"Down"])
+          });
+          el.gestureSetup = true;
+          app.ports.hammerjsSetupRaw.send(id);
         });
-        hammertime.on('swipedown', function(ev) {
-              app.ports.onSwipeRaw.send([id,"Down"])
-        });
-        el.gestureSetup = true;
-        app.ports.hammerjsSetupRaw.send(id);
       })
 
       /* CACHE */

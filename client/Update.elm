@@ -12,6 +12,7 @@ import Audio
 import MediaRecorder as MR
 import Gesture
 import Translation.Base as Trans
+import Translation.Cursor as Trans
 import Translation.Layout as Trans
 import Translation.Path as Trans
 import Translation.MaybeTraverse as TransMaybe
@@ -503,32 +504,7 @@ updateStoryPage { toMsg } message s =
 
         -- LAYOUT
         CollapsableChange idx new ->
-            updateSentences
-                (\para ->
-                    case para of
-                        Trans.Formatted formatted ->
-                            Trans.Formatted <|
-                                { formatted
-                                    | paragraph =
-                                        Tuple.mapFirst
-                                            (Dict.update idx
-                                                (Maybe.map
-                                                    (\sen ->
-                                                        { sen
-                                                            | collapsable =
-                                                                Trans.registerCursors new
-                                                        }
-                                                    )
-                                                )
-                                            )
-                                            formatted.paragraph
-                                }
-
-                        _ ->
-                            -- [todo] handle more gracefully
-                            Debug.crash "impossibru!"
-                )
-                s
+            updateFormattedCollapsable idx new s
 
         AnimationFrame _ ->
             let
@@ -789,8 +765,93 @@ updateStoryPage { toMsg } message s =
             in
                 s ! [ cmd ]
 
-        OnSwipe fpath dir ->
-            s ! Debug.log (toString ( fpath, dir )) []
+        OnSwipe ( idx, path ) dir ->
+            updateSentences
+                (\para ->
+                    case para of
+                        Trans.Formatted formatted ->
+                            Trans.Formatted <|
+                                { formatted
+                                    | paragraph =
+                                        Tuple.mapFirst
+                                            (Dict.update idx
+                                                (Maybe.map
+                                                    (\sen ->
+                                                        { sen
+                                                            | collapsable =
+                                                                case Trans.nodeAtPath path sen.collapsable of
+                                                                    Nothing ->
+                                                                        Debug.crash
+                                                                            ("Error when handling swiping: "
+                                                                                ++ "cannot find node at path: "
+                                                                                ++ toString path
+                                                                            )
+
+                                                                    Just ( _, z ) ->
+                                                                        case
+                                                                            z
+                                                                                |> Maybe.andThen
+                                                                                    (case dir of
+                                                                                        Gesture.Up ->
+                                                                                            Trans.collapse
+
+                                                                                        Gesture.Down ->
+                                                                                            Trans.expand
+                                                                                    )
+                                                                        of
+                                                                            Nothing ->
+                                                                                sen.collapsable
+
+                                                                            Just z ->
+                                                                                z
+                                                                                    |> Trans.underlyingCollapsable
+                                                                                    |> Trans.registerCursors
+                                                        }
+                                                    )
+                                                )
+                                            )
+                                            formatted.paragraph
+                                }
+
+                        _ ->
+                            -- [todo] handle more gracefully
+                            Debug.crash "impossibru!"
+                )
+                s
+
+
+updateFormattedCollapsable :
+    Int
+    -> Trans.Collapsable (List (Trans.Measured String)) (Trans.Measured Trans.Word)
+    -> StoryModel
+    -> ( StoryModel, Cmd Msg )
+updateFormattedCollapsable idx new s =
+    updateSentences
+        (\para ->
+            case para of
+                Trans.Formatted formatted ->
+                    Trans.Formatted <|
+                        { formatted
+                            | paragraph =
+                                Tuple.mapFirst
+                                    (Dict.update idx
+                                        (Maybe.map
+                                            (\sen ->
+                                                { sen
+                                                    | collapsable =
+                                                        Trans.registerCursors new
+                                                }
+                                            )
+                                        )
+                                    )
+                                    formatted.paragraph
+                        }
+
+                _ ->
+                    -- [todo] handle more gracefully
+                    Debug.crash "impossibru!"
+        )
+        s
 
 
 updateStoryEdit :

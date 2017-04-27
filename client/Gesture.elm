@@ -1,7 +1,7 @@
 port module Gesture
     exposing
         ( Id
-        , Direction
+        , Direction(..)
         , setupHammerjs
         , hammerjsSetup
         , onSwipe

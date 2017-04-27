@@ -13,21 +13,6 @@ import Helper
 
 {-| [todo] move this into the main view code to avoid using Maybe
 -}
-
-
-
--- { formatted
---     | paragraph =
---         Tuple.mapFirst
---             (Dict.map
---                 (\_ i ->
---                     { i | collapsablers i.collapsable }
---                 )
---             )
---             formatted.paragraph
--- }
-
-
 type alias RegisteredCollapsable a b =
     Collapsable ( a, Maybe (CursorZipper a b) ) b
 
