@@ -30,8 +30,8 @@ styles =
     Css.asPairs >> Html.Attributes.style
 
 
-view : StoryState -> Maybe Int -> Html StoryMsg
-view { sentences } curIdx =
+view : StoryState -> PlaybackState -> Maybe Int -> Html StoryMsg
+view { sentences } playbackState curIdx =
     case sentences of
         Measuring ( raw, ellipses ) ->
             div [] <|
@@ -64,7 +64,7 @@ view { sentences } curIdx =
                         )
                         formatted.paragraph
             }
-                |> splitParagraph curIdx
+                |> splitParagraph curIdx playbackState
 
         LayoutError e ->
             -- [todo] handle more gracefully
@@ -137,11 +137,12 @@ measureDiv m =
 
 splitParagraph :
     Maybe Int
+    -> PlaybackState
     -> { paragraph : ( Paragraph ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word), Measured String )
        , hover : Maybe FullPath
        }
     -> Html StoryMsg
-splitParagraph curIdx { paragraph, hover } =
+splitParagraph curIdx playbackState { paragraph, hover } =
     let
         ( para, ellipses ) =
             paragraph
@@ -165,6 +166,7 @@ splitParagraph curIdx { paragraph, hover } =
                                 |> Maybe.map ((==) idx)
                                 |> Maybe.withDefault False
                             )
+                            playbackState
                             (hover
                                 |> Maybe.andThen
                                     (\( idxpath, path ) ->
@@ -184,10 +186,11 @@ splitCollapsable :
     Measured String
     -> Int
     -> Bool
+    -> PlaybackState
     -> Maybe Path
     -> Collapsable ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word)
     -> Nonempty (Measured (Html StoryMsg))
-splitCollapsable ellipses idx marked hover =
+splitCollapsable ellipses idx marked playbackState hover =
     let
         wordView : Measured Word -> Nonempty (Measured (Html StoryMsg))
         wordView w =
@@ -204,7 +207,10 @@ splitCollapsable ellipses idx marked hover =
                                         [ class [ Marked ] ]
                                       else
                                         []
-                                    , [ onClick (TextClicked idx) ]
+                                    , if isLoaded playbackState then
+                                        [ onClick (TextClicked idx) ]
+                                      else
+                                        []
                                     ]
                                 )
                                 [ text w.content ]

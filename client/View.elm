@@ -373,6 +373,7 @@ storyView s =
 
             RD.Success story ->
                 TransView.view story
+                    s.playbackState
                     (currentItemState s.playbackState |> Maybe.map .itemId)
         ]
 
@@ -597,7 +598,7 @@ playbackView { playbackState } =
                 [ text
                     (case playbackState of
                         NotLoaded ->
-                            "Play"
+                            "No Audio"
 
                         Stopped _ ->
                             "Play"
