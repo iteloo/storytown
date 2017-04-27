@@ -8,6 +8,7 @@ import Translation.Cursor exposing (..)
 import Translation.Block exposing (..)
 import Translation.Layout exposing (..)
 import Translation.Path exposing (..)
+import Gesture
 import Helper
 import Helper.State2
 import Either exposing (Either(..))
@@ -147,7 +148,10 @@ splitParagraph curIdx playbackState { paragraph, hover } =
         ( para, ellipses ) =
             paragraph
     in
-        div [ class [ FakeTable ] ]
+        div
+            [ Html.Attributes.id "paraDiv"
+            , class [ FakeTable ]
+            ]
             << List.map
                 (div [ class [ FakeRow ] ]
                     << Nonempty.toList
@@ -400,7 +404,9 @@ genericBlockView idx path isHover ( tr, z ) width childViews =
                         [ div [ class [ SidePadding ] ]
                             [ div
                                 (List.concat
-                                    [ [ class <|
+                                    [ [ Html.Attributes.id
+                                            (Gesture.toDivId ( idx, path ))
+                                      , class <|
                                             addMin z <|
                                                 List.concat
                                                     [ [ Hoverarea ]

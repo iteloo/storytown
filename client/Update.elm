@@ -10,6 +10,7 @@ import S3
 import Api
 import Audio
 import MediaRecorder as MR
+import Gesture
 import Translation.Base as Trans
 import Translation.Layout as Trans
 import Translation.Path as Trans
@@ -102,6 +103,12 @@ storySub s =
                         Sub.batch
                             [ AnimationFrame.times AnimationFrame
                             , Overflow.measured (uncurry LineWrapMeasured)
+                            ]
+
+                    Trans.Formatted _ ->
+                        Sub.batch
+                            [ AnimationFrame.times SetupHammerjs
+                            , Gesture.onSwipe OnSwipe
                             ]
 
                     _ ->
@@ -749,6 +756,39 @@ updateStoryPage { toMsg } message s =
                     --           only allow playback when all items formatted
                     :>
                         loadAudio
+
+        SetupHammerjs _ ->
+            let
+                -- [todo] add a Formatting state
+                ( _, cmd ) =
+                    RD.update
+                        (\story ->
+                            ()
+                                ! case story.sentences of
+                                    Trans.Formatted { paragraph } ->
+                                        paragraph
+                                            |> Tuple.first
+                                            |> Dict.map
+                                                (\idx ss ->
+                                                    Trans.pathedMap
+                                                        (\path _ ->
+                                                            Gesture.setupHammerjs
+                                                                ( idx, path )
+                                                        )
+                                                        ss.collapsable
+                                                )
+                                            >> Dict.values
+                                            >> List.concatMap Trans.nodes
+
+                                    _ ->
+                                        []
+                        )
+                        s.story
+            in
+                s ! [ cmd ]
+
+        OnSwipe fpath dir ->
+            s ! Debug.log (toString ( fpath, dir )) []
 
 
 updateStoryEdit :

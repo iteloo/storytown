@@ -4,10 +4,11 @@ import Model exposing (..)
 import Api
 import Language exposing (Language)
 import MediaRecorder as MR
-import Navigation as Nav
+import Gesture
 import Translation.Base as Trans exposing (Collapsable, Word)
 import Translation.Layout as Trans exposing (Measured)
 import Translation.Path as Trans
+import Navigation as Nav
 import Time
 import Bootstrap.Navbar as Navbar
 import Bootstrap.Dropdown as Dropdown
@@ -85,6 +86,8 @@ type StoryMsg
     | CollapsableChange Int (Collapsable (List (Measured String)) (Measured Word))
     | AnimationFrame Time.Time
     | LineWrapMeasured Trans.Measure Trans.Measurement
+    | SetupHammerjs Time.Time
+    | OnSwipe Trans.FullPath Gesture.Direction
 
 
 type StoryEditMsg

@@ -4,19 +4,39 @@
     <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Recommended for Hammer.js -->
+    <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1">
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
   </head>
   <body>
-
     <div id="main"></div>
     <script src="main.js"></script>
     <script src="BufferLoader.js"></script>
     <script src="https://code.jquery.com/jquery-1.8.3.min.js"
         integrity="sha256-YcbK69I5IXQftf/mYD8WY0/KmEDCv1asggHpJk1trM8="
         crossorigin="anonymous"></script>
+    <script src="hammer.js"></script>
     <script>
       var app = Elm.Main.fullscreen();
+
+      /* GESTURE */
+
+      app.ports.setupHammerjsRaw.subscribe(id => {
+        var el = document.getElementById(id);
+        if (el == undefined || el.gestureSetup) { return ;}
+
+        var hammertime = new Hammer(el);
+        hammertime.get('swipe').set({ direction: Hammer.DIRECTION_VERTICAL });
+        hammertime.on('swipeup', function(ev) {
+              app.ports.onSwipeRaw.send([id,"Up"])
+        });
+        hammertime.on('swipedown', function(ev) {
+              app.ports.onSwipeRaw.send([id,"Down"])
+        });
+        el.gestureSetup = true;
+        app.ports.hammerjsSetupRaw.send(id);
+      })
 
       /* CACHE */
       app.ports.getRaw.subscribe(key => {
