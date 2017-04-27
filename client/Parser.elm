@@ -6,7 +6,7 @@ module Parser
         )
 
 import Language exposing (Language(..))
-import Regex
+import Helper
 import Combine exposing (..)
 import Combine.Char exposing (..)
 import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
@@ -49,8 +49,8 @@ translatedBlockFromExpr lang exp =
                     English ->
                         case
                             w
-                                |> Regex.find Regex.All (Regex.regex "[^\\s]*\\s*")
-                                |> List.map (.match >> L2Word)
+                                |> Helper.splitByAndPreserveSpaces
+                                |> List.map L2Word
                                 |> Nonempty.fromList
                         of
                             Nothing ->

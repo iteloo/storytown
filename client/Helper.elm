@@ -1,7 +1,8 @@
 module Helper exposing (..)
 
-import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 import Helper.Cont as Cont exposing (Cont)
+import Regex
+import List.Nonempty as Nonempty exposing (Nonempty(..), (:::))
 
 
 isJust : Maybe a -> Bool
@@ -138,6 +139,12 @@ zipList xs ys =
 
         _ ->
             Nothing
+
+
+splitByAndPreserveSpaces : String -> List String
+splitByAndPreserveSpaces =
+    Regex.find Regex.All (Regex.regex "[^\\s]*\\s*")
+        >> List.map .match
 
 
 

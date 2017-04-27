@@ -2,7 +2,7 @@ module Update exposing (init, subs, update)
 
 import Model exposing (..)
 import Message exposing (..)
-import Language
+import Language exposing (Language(..))
 import Cache
 import Routing
 import Server
@@ -368,16 +368,23 @@ updateStoryPage { toMsg } message s =
         -- SERVER
         StoryReceived story ->
             let
-                itemToSentence lang { text, audioUrl } =
-                    case Parser.parseTranslatedText lang text of
+                splitTrans lang =
+                    case lang of
+                        English ->
+                            Helper.splitByAndPreserveSpaces >> Left
+
+                        Mandarin ->
+                            String.toList
+                                >> List.map String.fromChar
+                                >> Left
+
+                itemToSentence source target { text, audioUrl } =
+                    case Parser.parseTranslatedText source text of
                         Ok r ->
                             { collapsable =
                                 Trans.fullyCollapsed r
                                     |> Trans.mapCollapsable
-                                        (String.toList
-                                            >> List.map String.fromChar
-                                            >> Left
-                                        )
+                                        (splitTrans target)
                                         identity
                             , audioUrl = audioUrl
                             }
@@ -403,7 +410,7 @@ updateStoryPage { toMsg } message s =
                                                     Dict.fromList <|
                                                         List.indexedMap (,) <|
                                                             List.map
-                                                                (itemToSentence source)
+                                                                (itemToSentence source target)
                                                                 sty.sentences
                                                 , Left ".."
                                                 )
