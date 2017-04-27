@@ -41,7 +41,13 @@ type alias ParagraphLayout =
     -- [todo] clean up namespace
     Layout ( Either (Paragraph (Either (List String) (List (Measured String))) Word) (Paragraph (Either (List String) (List (Measured String))) (Measured Word)), Either String (Measured String) )
         { paragraph :
-            ( RegisteredParagraph (List (Measured String)) (Measured Word), Measured String )
+            ( RegisteredParagraph
+                { trans : List (Measured String)
+                , gestureSetup : Bool
+                }
+                (Measured Word)
+            , Measured String
+            )
         , hover : Maybe FullPath
         }
         ParagraphLayoutError

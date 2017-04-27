@@ -107,11 +107,24 @@ storySub s =
                             , Overflow.measured (uncurry LineWrapMeasured)
                             ]
 
-                    Trans.Formatted _ ->
-                        Sub.batch
-                            [ AnimationFrame.times SetupHammerjs
-                            , Gesture.onSwipe OnSwipe
-                            ]
+                    Trans.Formatted { paragraph } ->
+                        Sub.batch <|
+                            List.concat
+                                [ [ Gesture.onSwipe OnSwipe ]
+                                , if
+                                    paragraph
+                                        |> Tuple.first
+                                        |> Dict.values
+                                        |> List.concatMap (.collapsable >> Trans.nodes)
+                                        |> List.filter (Tuple.second >> Helper.isJust)
+                                        |> List.all (Tuple.first >> .gestureSetup)
+                                  then
+                                    []
+                                  else
+                                    [ AnimationFrame.times SetupHammerjs
+                                    , Gesture.hammerjsSetup GestureSetup
+                                    ]
+                                ]
 
                     _ ->
                         Sub.none
@@ -608,7 +621,15 @@ updateStoryPage { toMsg } message s =
                                                     (\_ sen ->
                                                         { sen
                                                             | collapsable =
-                                                                Trans.registerCursors sen.collapsable
+                                                                sen.collapsable
+                                                                    |> Trans.mapCollapsable
+                                                                        (\tr ->
+                                                                            { trans = tr
+                                                                            , gestureSetup = False
+                                                                            }
+                                                                        )
+                                                                        identity
+                                                                    |> Trans.registerCursors
                                                         }
                                                     )
                                                 )
@@ -819,10 +840,60 @@ updateStoryPage { toMsg } message s =
                 )
                 s
 
+        GestureSetup ( idx, path ) ->
+            updateSentences
+                (\para ->
+                    case para of
+                        Trans.Formatted formatted ->
+                            Trans.Formatted <|
+                                { formatted
+                                    | paragraph =
+                                        Tuple.mapFirst
+                                            (Dict.update idx
+                                                (Maybe.map
+                                                    (\sen ->
+                                                        { sen
+                                                            | collapsable =
+                                                                case
+                                                                    sen.collapsable
+                                                                        |> Trans.nodeAtPath path
+                                                                        |> Maybe.andThen
+                                                                            (\( tr, z ) ->
+                                                                                sen.collapsable
+                                                                                    |> Trans.setAtPath path
+                                                                                        ( { tr | gestureSetup = True }, z )
+                                                                            )
+                                                                of
+                                                                    Nothing ->
+                                                                        Debug.crash
+                                                                            ("Error when setting gestureSetup flag: "
+                                                                                ++ "cannot find node at path: "
+                                                                                ++ toString path
+                                                                            )
+
+                                                                    Just x ->
+                                                                        x
+                                                        }
+                                                    )
+                                                )
+                                            )
+                                            formatted.paragraph
+                                }
+
+                        _ ->
+                            -- [todo] handle more gracefully
+                            Debug.crash "impossibru!"
+                )
+                s
+
 
 updateFormattedCollapsable :
     Int
-    -> Trans.Collapsable (List (Trans.Measured String)) (Trans.Measured Trans.Word)
+    -> Trans.Collapsable
+        { trans : List (Trans.Measured String)
+        , gestureSetup : Bool
+        }
+        (Trans.Measured Trans.Word)
     -> StoryModel
     -> ( StoryModel, Cmd Msg )
 updateFormattedCollapsable idx new s =

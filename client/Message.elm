@@ -83,11 +83,19 @@ type StoryMsg
     | PlaybackStateChanged PlaybackState
     | NextSentence Int
       -- LAYOUT
-    | CollapsableChange Int (Collapsable (List (Measured String)) (Measured Word))
+    | CollapsableChange
+        Int
+        (Collapsable
+            { trans : List (Measured String)
+            , gestureSetup : Bool
+            }
+            (Measured Word)
+        )
     | AnimationFrame Time.Time
     | LineWrapMeasured Trans.Measure Trans.Measurement
     | SetupHammerjs Time.Time
     | OnSwipe Trans.FullPath Gesture.Direction
+    | GestureSetup Trans.FullPath
 
 
 type StoryEditMsg

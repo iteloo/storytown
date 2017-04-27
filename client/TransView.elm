@@ -54,6 +54,20 @@ view { sentences } playbackState curIdx =
                     ]
 
         Formatted formatted ->
+            -- { formatted
+            --     | paragraph =
+            --         formatted.paragraph
+            --             |> Tuple.mapFirst
+            --                 (Dict.map
+            --                     (\_ sen ->
+            --                         { sen
+            --                             | collapsable =
+            --                                 sen.collapsable
+            --                                     |> mapCollapsable .trans identity
+            --                         }
+            --                     )
+            --                 )
+            -- }
             formatted |> splitParagraph curIdx playbackState
 
         LayoutError e ->
@@ -128,7 +142,14 @@ measureDiv m =
 splitParagraph :
     Maybe Int
     -> PlaybackState
-    -> { paragraph : ( Paragraph ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word), Measured String )
+    -> { paragraph :
+            ( RegisteredParagraph
+                { trans : List (Measured String)
+                , gestureSetup : Bool
+                }
+                (Measured Word)
+            , Measured String
+            )
        , hover : Maybe FullPath
        }
     -> Html StoryMsg
@@ -169,6 +190,7 @@ splitParagraph curIdx playbackState { paragraph, hover } =
                                             Nothing
                                     )
                             )
+                        << mapCollapsable (Tuple.mapFirst .trans) identity
                         << .collapsable
                 )
         <|
@@ -181,7 +203,17 @@ splitCollapsable :
     -> Bool
     -> PlaybackState
     -> Maybe Path
-    -> Collapsable ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) (Measured Word)
+    -> Collapsable
+        ( List (Measured String)
+        , Maybe
+            (CursorZipper
+                { trans : List (Measured String)
+                , gestureSetup : Bool
+                }
+                (Measured Word)
+            )
+        )
+        (Measured Word)
     -> Nonempty (Measured (Html StoryMsg))
 splitCollapsable ellipses idx marked playbackState hover =
     let
@@ -211,7 +243,17 @@ splitCollapsable ellipses idx marked playbackState hover =
                 }
 
         splitTrans :
-            ( Path, ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) )
+            ( Path
+            , ( List (Measured String)
+              , Maybe
+                    (CursorZipper
+                        { trans : List (Measured String)
+                        , gestureSetup : Bool
+                        }
+                        (Measured Word)
+                    )
+              )
+            )
             -> Nonempty (Nonempty (Measured (Html StoryMsg)))
             -> Nonempty (Measured (Html StoryMsg))
         splitTrans ( path, ( trs, z ) ) =
@@ -268,7 +310,15 @@ splitCollapsable ellipses idx marked playbackState hover =
 
         mkBlock :
             Path
-            -> ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
+            -> ( List (Measured String)
+               , Maybe
+                    (CursorZipper
+                        { trans : List (Measured String)
+                        , gestureSetup : Bool
+                        }
+                        (Measured Word)
+                    )
+               )
             -> Nonempty (Measured (Html StoryMsg))
             -> Measured (Html StoryMsg)
         mkBlock path trz mbs =
@@ -296,7 +346,17 @@ splitCollapsable ellipses idx marked playbackState hover =
                 }
 
         expandedBlock :
-            ( Path, ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) )
+            ( Path
+            , ( List (Measured String)
+              , Maybe
+                    (CursorZipper
+                        { trans : List (Measured String)
+                        , gestureSetup : Bool
+                        }
+                        (Measured Word)
+                    )
+              )
+            )
             -> AtLeastOneOf (Nonempty (Measured (Html StoryMsg))) (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
         expandedBlock trzs =
@@ -307,7 +367,17 @@ splitCollapsable ellipses idx marked playbackState hover =
                 << AtLeastOneOf.map identity wordView
 
         terminalBlock :
-            ( Path, ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) )
+            ( Path
+            , ( List (Measured String)
+              , Maybe
+                    (CursorZipper
+                        { trans : List (Measured String)
+                        , gestureSetup : Bool
+                        }
+                        (Measured Word)
+                    )
+              )
+            )
             -> Nonempty (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
         terminalBlock trzs =
@@ -317,7 +387,17 @@ splitCollapsable ellipses idx marked playbackState hover =
 
         -- [note] identical to expandedBlock right now
         collapsedBlock :
-            ( Path, ( List (Measured String), Maybe (CursorZipper (List (Measured String)) (Measured Word)) ) )
+            ( Path
+            , ( List (Measured String)
+              , Maybe
+                    (CursorZipper
+                        { trans : List (Measured String)
+                        , gestureSetup : Bool
+                        }
+                        (Measured Word)
+                    )
+              )
+            )
             -> AtLeastOneOf (Nonempty (Measured (Html StoryMsg))) (Measured Word)
             -> Nonempty (Measured (Html StoryMsg))
         collapsedBlock trzs =
@@ -341,7 +421,15 @@ genericBlockView :
     Int
     -> Path
     -> Bool
-    -> ( String, Maybe (CursorZipper (List (Measured String)) (Measured Word)) )
+    -> ( String
+       , Maybe
+            (CursorZipper
+                { trans : List (Measured String)
+                , gestureSetup : Bool
+                }
+                (Measured Word)
+            )
+       )
     -> Float
     -> List (Html StoryMsg)
     -> Html StoryMsg
@@ -394,37 +482,6 @@ genericBlockView idx path isHover ( tr, z ) width childViews =
         ]
 
 
-
--- [todo] incorporate this function
---  let
---     txt =
---         a
---             (if
---                 isPaused playbackState
---                     || isPlaying playbackState
---              then
---                 [ onClick (TextClicked index) ]
---              else
---                 []
---             )
---             [ textarea
---                 [ placeholder "Write something..."
---                 , onInput (ItemSourceChange index)
---                 ]
---                 [ text item.text ]
---             ]
---   in
---     if
---         currentItemState playbackState
---             |> Maybe.map ((==) index << .itemId)
---             |> Maybe.withDefault False
---     then
---         mark []
---             [ txt ]
---     else
---         txt
-
-
 addMin : Maybe a -> List CssClass -> List CssClass
 addMin z =
     case z of
@@ -437,7 +494,13 @@ addMin z =
 
 addExpand :
     Int
-    -> Maybe (CursorZipper (List (Measured String)) (Measured Word))
+    -> Maybe
+        (CursorZipper
+            { trans : List (Measured String)
+            , gestureSetup : Bool
+            }
+            (Measured Word)
+        )
     -> List (Html StoryMsg)
     -> List (Html StoryMsg)
 addExpand idx z =
@@ -459,7 +522,13 @@ addExpand idx z =
 
 addCollapse :
     Int
-    -> Maybe (CursorZipper (List (Measured String)) (Measured Word))
+    -> Maybe
+        (CursorZipper
+            { trans : List (Measured String)
+            , gestureSetup : Bool
+            }
+            (Measured Word)
+        )
     -> List (Html StoryMsg)
     -> List (Html StoryMsg)
 addCollapse idx z =
