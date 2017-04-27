@@ -198,15 +198,16 @@ splitCollapsable ellipses idx marked hover =
                             [ class [ FakeCell, Orig ]
                             , styles [ Css.width (Css.px w.width) ]
                             ]
-                            [ let
-                                txt =
-                                    a [ onClick (TextClicked idx) ]
-                                        [ text w.content ]
-                              in
-                                if marked then
-                                    mark [] [ txt ]
-                                else
-                                    txt
+                            [ a
+                                (List.concat
+                                    [ if marked then
+                                        [ class [ Marked ] ]
+                                      else
+                                        []
+                                    , [ onClick (TextClicked idx) ]
+                                    ]
+                                )
+                                [ text w.content ]
                             ]
                 }
 

@@ -32,6 +32,7 @@ type CssClass
     | Expand
     | Collapse
     | ColouredSpace
+    | Marked
 
 
 css : Stylesheet
@@ -175,4 +176,6 @@ css =
             , class ColouredSpace
                 [ backgroundColor (orange 0.2)
                 ]
+            , class Marked
+                [ backgroundColor (orange 0.2) ]
             ]
